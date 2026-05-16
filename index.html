@@ -6,6 +6,7 @@
 <title>ระบบสอบออนไลน์</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Kanit:wght@400;500;600;700&display=swap');
 
@@ -827,6 +828,11 @@
     <div class="section-card">
       <div class="section-title">ตั้งค่าการสอบ</div>
       <div class="form-group">
+        <label>GitHub Pages URL (สำคัญ!)</label>
+        <input type="text" id="githubURL" placeholder="https://dinny2520-hash.github.io/exam/">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">ใส่ URL ของ GitHub Pages เพื่อให้สร้างลิงก์นักเรียนถูกต้อง</div>
+      </div>
+      <div class="form-group">
         <label>ชื่อวิชา / ชื่อการสอบ</label>
         <input type="text" id="examTitle" value="แบบทดสอบ" placeholder="เช่น วิทยาศาสตร์ ม.3">
       </div>
@@ -851,8 +857,14 @@
 
     <div class="section-card">
       <div class="section-title">แชร์ข้อสอบให้นักเรียน</div>
-      <div class="alert alert-info">กด "สร้างลิงก์" เพื่อได้ URL ที่มีข้อสอบฝังอยู่แล้ว นักเรียนกดลิงก์เข้าสอบได้เลย ไม่ต้องนำเข้าไฟล์</div>
-      <button class="btn btn-accent" onclick="exportExamURL()">🔗 สร้างลิงก์สำหรับนักเรียน</button>
+      <div class="alert alert-info">
+        วิธีใหม่: ดาวน์โหลดไฟล์ข้อสอบ แล้วอัปโหลดขึ้น GitHub พร้อมกับ index.html<br>
+        นักเรียนเปิด <strong>https://dinny2520-hash.github.io/exam/</strong> ได้เลย URL สั้น ไม่มีโค้ดยาวๆ
+      </div>
+      <button class="btn btn-accent" onclick="downloadQuestionsJSON()">⬇️ ดาวน์โหลดไฟล์ข้อสอบ (questions.json)</button>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-muted);">
+        หลังดาวน์โหลด → อัปโหลด questions.json ขึ้น GitHub repo เดียวกับ index.html
+      </div>
     </div>
 
     <div class="section-card">
@@ -961,9 +973,11 @@
   <div class="locked-page">
     <div class="lock-icon">🔒</div>
     <h2>การสอบถูกระงับ</h2>
-    <p>คุณออกจากหน้าจอสอบเกินจำนวนครั้งที่กำหนด<br>กรุณารอผู้ดูแลมาปลดล็อค</p>
-    <p style="font-size:13px;opacity:0.65;margin-bottom:16px;">หากเป็นผู้ดูแล ใส่รหัสปลดล็อคด้านล่าง</p>
-    <input type="text" class="unlock-input" id="unlockInput" placeholder="รหัส..." maxlength="4" inputmode="numeric">
+    <p>คุณออกจากหน้าจอสอบเกินจำนวนครั้งที่กำหนด<br><strong>กรุณาแจ้งเจ้าหน้าที่เพื่อปลดล็อค</strong></p>
+    <p style="font-size:13px;opacity:0.7;margin-bottom:8px;">ห้ามปิดหน้าต่างนี้จนกว่าเจ้าหน้าที่จะมาปลดล็อค</p>
+    <div style="width:48px;height:3px;background:rgba(255,255,255,0.3);border-radius:2px;margin:0 auto 20px;"></div>
+    <p style="font-size:12px;opacity:0.5;margin-bottom:12px;">— สำหรับเจ้าหน้าที่เท่านั้น —</p>
+    <input type="password" class="unlock-input" id="unlockInput" placeholder="รหัสเจ้าหน้าที่..." maxlength="20" inputmode="text" onkeydown="if(event.key==='Enter')tryUnlock()">
     <div style="margin-top:16px;">
       <button class="btn btn-accent" onclick="tryUnlock()" style="width:auto;padding:11px 32px;">🔓 ปลดล็อค</button>
     </div>
@@ -989,16 +1003,26 @@
 </div>
 
 <!-- ===== EXPORT URL OVERLAY ===== -->
-<div id="exportUrlOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:white;border-radius:20px;padding:24px;width:100%;max-width:500px;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
-    <div style="font-family:'Kanit',sans-serif;font-size:16px;font-weight:600;color:var(--primary);margin-bottom:12px;">🔗 ลิงก์สำหรับนักเรียน</div>
-    <div class="alert alert-info" style="margin-bottom:12px;">นักเรียนกดลิงก์นี้จะเข้าสู่หน้าสอบโดยตรง ไม่เห็นหน้าผู้ดูแล</div>
-    <textarea id="exportUrlBox" readonly style="font-size:11px;height:100px;background:#f8fafc;word-break:break-all;margin-bottom:12px;font-family:monospace;"></textarea>
+<div id="exportUrlOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:20px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,0.25);max-height:92vh;overflow-y:auto;">
+    <div style="font-family:'Kanit',sans-serif;font-size:16px;font-weight:600;color:var(--primary);margin-bottom:4px;">🔗 แชร์ข้อสอบให้นักเรียน</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">สแกน QR หรือกดคัดลอกลิงก์แล้วแชร์ให้นักเรียน</div>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="display:inline-block;padding:10px;border:1.5px solid var(--border);border-radius:12px;background:#fff;">
+        <img id="qrImg" src="" alt="QR" style="width:180px;height:180px;display:block;">
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">สแกน QR ด้วยกล้องมือถือ</div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">ลิงก์สำหรับนักเรียน</div>
+      <div id="shortUrlDisplay" style="background:#eef3fb;border-radius:10px;padding:12px 14px;word-break:break-all;min-height:44px;display:flex;align-items:center;">
+        <span id="shortUrlText" style="color:var(--primary);font-weight:600;font-size:14px;">กำลังสร้างลิงก์...</span>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;">
-      <button class="btn btn-primary" id="copyUrlBtn" onclick="copyExamURL()" style="flex:2;">📋 คัดลอก URL</button>
+      <button class="btn btn-primary" id="copyShortBtn" onclick="copyShortURL()" style="flex:2;">📋 คัดลอกลิงก์</button>
       <button class="btn btn-outline" onclick="document.getElementById('exportUrlOverlay').style.display='none'" style="flex:1;">ปิด</button>
     </div>
-    <div style="margin-top:12px;font-size:12px;color:var(--text-muted);">⚠️ หาก URL ยาวเกินไป แนะนำใช้บริการย่อ URL เช่น bit.ly</div>
   </div>
 </div>
 
@@ -1080,43 +1104,52 @@ let examResults = null;
 const choiceLabels = ['ก', 'ข', 'ค', 'ง'];
 
 // ============================================================
-// INIT
-// ============================================================
-function init() {
-  loadFromStorage();
-  renderQuestionList();
-  updateReadyAlert();
-  setupAntiCheat();
-}
-
-// ============================================================
 // INIT — ตรวจสอบ URL mode
 // ============================================================
 function init() {
-  // ตรวจว่ามี exam data ใน URL hash หรือไม่
   const hash = window.location.hash;
+
+  // โหมดนักเรียน: เปิดจาก GitHub (https://) → โหลด questions.json อัตโนมัติ
+  if (window.location.protocol === 'https:' && !hash.startsWith('#exam=') && !hash.startsWith('#admin')) {
+    loadFromGitHub();
+    setupAntiCheat();
+    return;
+  }
+
+  // โหมดนักเรียน URL เก่า (มี #exam=)
   if (hash && hash.startsWith('#exam=')) {
-    // โหมดนักเรียน: โหลดข้อสอบจาก URL
     try {
-      const encoded = hash.slice(6);
-      const json = decodeURIComponent(atob(encoded));
+      const compressed = hash.slice(6);
+      const json = LZString.decompressFromEncodedURIComponent(compressed);
+      if (!json) throw new Error('decompress failed');
       const data = JSON.parse(json);
       questions = data.questions || [];
       examSettings = { ...examSettings, ...(data.settings || {}) };
       maxWarnings = examSettings.maxWarnings;
-      // ซ่อนทุกอย่างที่เป็น admin — เข้าสู่โหมดสอบโดยตรง
       document.getElementById('mainHeader').style.display = 'none';
       document.getElementById('modeBar').style.display = 'none';
       showPage('loginPage');
       document.getElementById('loginExamTitle').textContent = examSettings.title;
     } catch(e) {
-      alert('ลิงก์ข้อสอบไม่ถูกต้อง กรุณาตรวจสอบ URL');
+      try {
+        const json = decodeURIComponent(atob(hash.slice(6)));
+        const data = JSON.parse(json);
+        questions = data.questions || [];
+        examSettings = { ...examSettings, ...(data.settings || {}) };
+        maxWarnings = examSettings.maxWarnings;
+        document.getElementById('mainHeader').style.display = 'none';
+        document.getElementById('modeBar').style.display = 'none';
+        showPage('loginPage');
+        document.getElementById('loginExamTitle').textContent = examSettings.title;
+      } catch(e2) {
+        alert('ลิงก์ข้อสอบไม่ถูกต้อง');
+      }
     }
     setupAntiCheat();
     return;
   }
 
-  // โหมด admin: โหลดจาก localStorage ปกติ
+  // โหมด admin (เปิดไฟล์จากเครื่อง)
   loadFromStorage();
   renderQuestionList();
   updateReadyAlert();
@@ -1124,16 +1157,63 @@ function init() {
   checkAdminLogin();
 }
 
-// Admin login gate
-let isAdminLoggedIn = false;
-function checkAdminLogin() {
-  const saved = sessionStorage.getItem('admin_auth');
-  if (saved === examSettings.unlockCode) {
-    isAdminLoggedIn = true;
-    showPage('adminPage');
-  } else {
-    showAdminLoginPrompt();
+// โหลดข้อสอบจาก questions.json บน GitHub
+async function loadFromGitHub() {
+  document.getElementById('mainHeader').style.display = 'none';
+  document.getElementById('modeBar').style.display = 'none';
+
+  // แสดง loading
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.body.innerHTML += `
+    <div id="loadingScreen" style="position:fixed;inset:0;background:linear-gradient(160deg,#0f2348,#1a3a6b);display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:'Kanit',sans-serif;">
+      <div style="font-size:48px;margin-bottom:16px;">📝</div>
+      <div style="font-size:20px;font-weight:600;">กำลังโหลดข้อสอบ...</div>
+      <div style="font-size:14px;opacity:0.7;margin-top:8px;">กรุณารอสักครู่</div>
+    </div>`;
+
+  try {
+    const res = await fetch('./questions.json?t=' + Date.now());
+    if (!res.ok) throw new Error('ไม่พบไฟล์ข้อสอบ');
+    const data = await res.json();
+    questions = data.questions || [];
+    examSettings = { ...examSettings, ...(data.settings || {}) };
+    maxWarnings = examSettings.maxWarnings;
+
+    document.getElementById('loadingScreen').remove();
+    showPage('loginPage');
+    document.getElementById('loginExamTitle').textContent = examSettings.title;
+  } catch(e) {
+    document.getElementById('loadingScreen').innerHTML = `
+      <div style="text-align:center;padding:32px;">
+        <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+        <div style="font-size:18px;font-weight:600;margin-bottom:8px;">ไม่พบไฟล์ข้อสอบ</div>
+        <div style="font-size:14px;opacity:0.8;line-height:1.6;">กรุณาอัปโหลดไฟล์ questions.json<br>ขึ้น GitHub repo ด้วยครับ</div>
+      </div>`;
   }
+}
+
+// ดาวน์โหลดข้อสอบเป็น questions.json
+function downloadQuestionsJSON() {
+  if (questions.length === 0) { alert('กรุณาเพิ่มข้อสอบก่อน'); return; }
+  const data = { questions, settings: examSettings };
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'questions.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setTimeout(() => {
+    alert('✅ ดาวน์โหลด questions.json แล้ว!\n\nขั้นตอนต่อไป:\n1. ไปที่ GitHub repo\n2. กด Add file → Upload files\n3. อัปโหลด questions.json\n4. กด Commit changes\n\nนักเรียนเปิด https://dinny2520-hash.github.io/exam/ ได้เลย!');
+  }, 500);
+}
+
+// Admin login gate — ไม่บังเมื่อเปิดไฟล์ปกติ
+let isAdminLoggedIn = true; // เปิดไฟล์ตรงถือว่าเป็น admin
+function checkAdminLogin() {
+  // ไม่ต้อง prompt เมื่อเปิดไฟล์ตรง
+  isAdminLoggedIn = true;
+  showPage('adminPage');
 }
 
 function showAdminLoginPrompt() {
@@ -1142,17 +1222,6 @@ function showAdminLoginPrompt() {
 }
 
 function submitAdminLogin() {
-  const code = document.getElementById('adminLoginCode').value.trim();
-  if (code === examSettings.unlockCode) {
-    isAdminLoggedIn = true;
-    sessionStorage.setItem('admin_auth', code);
-    document.getElementById('adminLoginOverlay').style.display = 'none';
-    showPage('adminPage');
-  } else {
-    document.getElementById('adminLoginErr').textContent = '❌ รหัสไม่ถูกต้อง';
-    document.getElementById('adminLoginCode').value = '';
-  }
-}
   const code = document.getElementById('adminLoginCode').value.trim();
   if (code === examSettings.unlockCode) {
     isAdminLoggedIn = true;
@@ -1176,34 +1245,67 @@ function loadFromStorage() {
 }
 
 // Export ข้อสอบเป็น URL
-function exportExamURL() {
+let fullExamURL = '';
+let shortExamURL = '';
+
+async function exportExamURL() {
   if (questions.length === 0) { alert('กรุณาเพิ่มข้อสอบก่อน'); return; }
   try {
     const data = { questions, settings: examSettings };
-    const json = JSON.stringify(data);
-    const encoded = btoa(encodeURIComponent(json));
-    const url = window.location.href.split('#')[0] + '#exam=' + encoded;
+    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(data));
 
-    // แสดง popup URL
-    document.getElementById('exportUrlBox').value = url;
+    // ใช้ GitHub URL เสมอ
+    const githubURL = (examSettings.githubURL || '').trim();
+    let baseURL = githubURL || window.location.href.split('#')[0];
+    if (!baseURL.endsWith('/')) baseURL += '/';
+
+    fullExamURL = baseURL + '#exam=' + compressed;
+    shortExamURL = fullExamURL;
+
+    // ถ้ายังไม่ได้ตั้ง GitHub URL
+    if (!githubURL || baseURL.startsWith('file://')) {
+      document.getElementById('exportUrlOverlay').style.display = 'flex';
+      document.getElementById('shortUrlText').innerHTML =
+        '<span style="color:#c0392b;">⚠️ กรุณาตั้งค่า GitHub Pages URL ในแท็บ ⚙️ ตั้งค่า ก่อนครับ</span>';
+      document.getElementById('qrImg').src = '';
+      return;
+    }
+
     document.getElementById('exportUrlOverlay').style.display = 'flex';
+    document.getElementById('copyShortBtn').textContent = '📋 คัดลอกลิงก์';
+
+    // แสดง URL โดยตรง ไม่ผ่าน TinyURL
+    document.getElementById('shortUrlText').innerHTML =
+      `<a href="${fullExamURL}" target="_blank" rel="noopener"
+        style="color:#1a3a6b;text-decoration:underline;font-weight:600;font-size:12px;word-break:break-all;">
+        ${fullExamURL.slice(0, 60)}...
+      </a>`;
+
+    // QR จาก GitHub URL โดยตรง
+    document.getElementById('qrImg').src =
+      'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(fullExamURL);
+
   } catch(e) {
-    alert('ข้อมูลใหญ่เกินไปสำหรับ URL กรุณาลดจำนวนข้อสอบลง');
+    alert('เกิดข้อผิดพลาด: ' + e.message);
   }
 }
 
-function copyExamURL() {
-  const box = document.getElementById('exportUrlBox');
-  box.select();
-  box.setSelectionRange(0, 99999);
-  navigator.clipboard.writeText(box.value).then(() => {
-    document.getElementById('copyUrlBtn').textContent = '✅ คัดลอกแล้ว!';
-    setTimeout(() => { document.getElementById('copyUrlBtn').textContent = '📋 คัดลอก URL'; }, 2000);
-  }).catch(() => {
-    document.execCommand('copy');
-    alert('คัดลอก URL แล้ว!');
+function copyShortURL() {
+  const url = shortExamURL || fullExamURL;
+  if (!url) return;
+  const copy = () => {
+    document.getElementById('copyShortBtn').textContent = '✅ คัดลอกแล้ว!';
+    setTimeout(() => { document.getElementById('copyShortBtn').textContent = '📋 คัดลอกลิงก์'; }, 2000);
+  };
+  navigator.clipboard.writeText(url).then(copy).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = url; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); copy();
   });
 }
+
+function generateQR() {} // kept for compatibility
 
 function saveToStorage() {
   localStorage.setItem('exam_questions', JSON.stringify(questions));
@@ -1212,6 +1314,9 @@ function saveToStorage() {
 
 function applySettings() {
   document.getElementById('examTitle').value = examSettings.title;
+  if (document.getElementById('githubURL')) {
+    document.getElementById('githubURL').value = examSettings.githubURL || 'https://dinny2520-hash.github.io/exam/';
+  }
   document.getElementById('maxScore').value = examSettings.maxScore;
   document.getElementById('maxWarnings').value = examSettings.maxWarnings;
   document.getElementById('unlockCode').value = examSettings.unlockCode;
@@ -1234,7 +1339,11 @@ function showPage(id) {
 }
 
 function showAdminPanel() {
-  if (!isAdminLoggedIn) { showAdminLoginPrompt(); return; }
+  const isStudentMode = window.location.hash.startsWith('#exam=');
+  if (isStudentMode && !isAdminLoggedIn) {
+    showAdminLoginPrompt();
+    return;
+  }
   showPage('adminPage');
   switchMode('admin');
 }
@@ -1766,6 +1875,7 @@ function updateReadyAlert() {
 
 function saveSettings() {
   examSettings.title = document.getElementById('examTitle').value || 'แบบทดสอบ';
+  examSettings.githubURL = document.getElementById('githubURL').value.trim().replace(/\/$/, '') + '/';
   examSettings.maxScore = parseInt(document.getElementById('maxScore').value) || 100;
   examSettings.maxWarnings = parseInt(document.getElementById('maxWarnings').value);
   examSettings.unlockCode = document.getElementById('unlockCode').value || '1234';
@@ -1934,7 +2044,33 @@ function showResult(r) {
 // ANTI-CHEAT
 // ============================================================
 function setupAntiCheat() {
-  // Visibility change (switch app / minimize)
+  // ---- ป้องกัน Screenshot มือถือ (iOS/Android) ----
+  // ใช้ CSS media query ที่ทำงานตอน screenshot
+  const style = document.createElement('style');
+  style.id = 'antiScreenshot';
+  style.textContent = `
+    @media print {
+      body { display: none !important; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  // iOS: ตรวจ screenshot ผ่าน visibilitychange + pagehide
+  // Android: ตรวจผ่าน screenshot permission API (Chrome 94+)
+  if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+    // บล็อก screen capture API
+    const origGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getDisplayMedia = async () => {
+      if (examActive) {
+        flashProtect();
+        throw new Error('Screen capture blocked during exam');
+      }
+      return origGetDisplayMedia();
+    };
+  }
+
+  // ---- ป้องกัน Screenshot ด้วย CSS overlay ขณะสอบ ----
+  // เมื่อ screenshot บน iOS หน้าจะ flash ขาว
   document.addEventListener('visibilitychange', () => {
     if (!examActive || examLocked) return;
     if (document.hidden) {
@@ -1942,38 +2078,55 @@ function setupAntiCheat() {
     }
   });
 
-  // Blur (switch tab / app on some browsers)
   window.addEventListener('blur', () => {
     if (!examActive || examLocked || document.hidden) return;
     handleViolation();
   });
 
-  // Screenshot prevention: CSS hack (not 100% but helps)
-  // On screenshot attempt, flash white screen
+  // pagehide สำหรับ iOS Safari
+  window.addEventListener('pagehide', () => {
+    if (!examActive || examLocked) return;
+    handleViolation();
+  });
+
+  // Keyboard screenshot shortcuts
   document.addEventListener('keyup', (e) => {
-    // Windows: PrintScreen, Mac: Cmd+Shift+3/4/5
-    if (e.key === 'PrintScreen' || (e.metaKey && e.shiftKey && ['3','4','5','s'].includes(e.key))) {
+    if (!examActive) return;
+    if (e.key === 'PrintScreen' ||
+        (e.metaKey && e.shiftKey && ['3','4','5','s'].includes(e.key)) ||
+        (e.ctrlKey && e.shiftKey && ['s','p'].includes(e.key.toLowerCase()))) {
       flashProtect();
+      // ล้าง clipboard ทันที
+      navigator.clipboard.writeText('').catch(() => {});
     }
   });
 
-  // Prevent right-click
-  document.addEventListener('contextmenu', e => {
-    if (examActive) e.preventDefault();
-  });
+  // ป้องกัน right-click, copy, select, drag
+  document.addEventListener('contextmenu', e => { if (examActive) e.preventDefault(); });
+  document.addEventListener('selectstart', e => { if (examActive) e.preventDefault(); });
+  document.addEventListener('dragstart', e => { if (examActive) e.preventDefault(); });
+  document.addEventListener('copy', e => { if (examActive) e.preventDefault(); });
 
-  // Prevent select & drag
-  document.addEventListener('selectstart', e => {
-    if (examActive) e.preventDefault();
-  });
+  // ---- CSS ป้องกัน screenshot บนมือถือ ----
+  // เพิ่ม overlay ทึบขณะสอบ (flash เมื่อมีการ capture)
+  const ssOverlay = document.getElementById('ssProtect');
+  if (ssOverlay) {
+    ssOverlay.style.mixBlendMode = 'difference';
+  }
 }
 
 let flashTimeout;
 function flashProtect() {
   const el = document.getElementById('ssProtect');
+  if (!el) return;
+  // Flash ขาว → ทำให้ screenshot ได้แค่หน้าขาว
   el.style.background = 'white';
+  el.style.zIndex = '99999';
   clearTimeout(flashTimeout);
-  flashTimeout = setTimeout(() => { el.style.background = 'transparent'; }, 500);
+  flashTimeout = setTimeout(() => {
+    el.style.background = 'transparent';
+    el.style.zIndex = '9998';
+  }, 800);
 }
 
 function handleViolation() {
