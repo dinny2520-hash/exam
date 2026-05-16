@@ -1,0 +1,2084 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ระบบสอบออนไลน์</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Kanit:wght@400;500;600;700&display=swap');
+
+  :root {
+    --primary: #1a3a6b;
+    --primary-light: #2756a8;
+    --accent: #e8a020;
+    --danger: #c0392b;
+    --success: #1a7a4a;
+    --bg: #f0f4f8;
+    --card: #ffffff;
+    --text: #1a2035;
+    --text-muted: #5a6a85;
+    --border: #d0d8e8;
+    --shadow: 0 2px 16px rgba(26,58,107,0.10);
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Sarabun', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* ป้องกัน screenshot บน iOS/Android */
+  body.exam-active {
+    -webkit-touch-callout: none;
+  }
+
+  /* Anti-screenshot overlay - flicker on screenshot attempt */
+  .ss-protect {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    background: transparent;
+    transition: background 0.05s;
+  }
+
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+  }
+
+  .header h1 {
+    font-family: 'Kanit', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .header .subtitle {
+    font-size: 12px;
+    opacity: 0.8;
+    margin-top: 2px;
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ========== ADMIN PAGE ========== */
+  .admin-page { padding: 20px 16px 40px; max-width: 600px; margin: 0 auto; }
+
+  .section-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+  }
+
+  .section-title {
+    font-family: 'Kanit', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 18px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .form-group { margin-bottom: 14px; }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  input[type="text"], input[type="number"], textarea, select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: 'Sarabun', sans-serif;
+    background: #f8fafc;
+    color: var(--text);
+    transition: border 0.2s;
+    outline: none;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--primary-light);
+    background: white;
+  }
+
+  textarea { resize: vertical; min-height: 80px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Kanit', sans-serif;
+    cursor: pointer;
+    border: none;
+    transition: all 0.18s;
+    width: 100%;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+  }
+  .btn-primary:hover { background: var(--primary-light); transform: translateY(-1px); }
+  .btn-primary:active { transform: scale(0.98); }
+
+  .btn-accent {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-accent:hover { filter: brightness(1.1); }
+
+  .btn-danger {
+    background: var(--danger);
+    color: white;
+  }
+
+  .btn-success {
+    background: var(--success);
+    color: white;
+  }
+
+  .btn-outline {
+    background: white;
+    color: var(--primary);
+    border: 1.5px solid var(--primary);
+  }
+  .btn-outline:hover { background: #eef3fb; }
+
+  .btn-sm {
+    padding: 7px 14px;
+    font-size: 13px;
+    border-radius: 8px;
+    width: auto;
+  }
+
+  .btn + .btn { margin-top: 10px; }
+
+  .file-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #f8fafc;
+    position: relative;
+  }
+  .file-upload-area:hover { border-color: var(--primary-light); background: #eef3fb; }
+  .file-upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .file-upload-area .icon { font-size: 32px; margin-bottom: 8px; }
+  .file-upload-area p { font-size: 13px; color: var(--text-muted); }
+  .file-upload-area strong { color: var(--primary); }
+
+  .question-item {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+
+  .question-item .q-num {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+
+  .question-item .q-text {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .question-item .q-choices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .question-item .q-answer {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--success);
+    font-weight: 600;
+  }
+
+  .question-item .q-delete {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #fee;
+    color: var(--danger);
+    border: none;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .question-item .q-edit {
+    position: absolute;
+    top: 10px;
+    right: 46px;
+    background: #e8f0fe;
+    color: var(--primary);
+    border: none;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .edit-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 9999;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    animation: fadeIn 0.2s;
+  }
+
+  .edit-modal {
+    background: white;
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px 32px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.2);
+  }
+
+  .edit-modal h3 {
+    font-family: 'Kanit', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .edit-modal-close {
+    background: #f0f4f8;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+  }
+  }
+
+  .add-q-form {
+    background: #f0f8f4;
+    border: 1.5px solid #b8dfc8;
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-top: 12px;
+  }
+
+  .choice-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .choice-label { font-size: 13px; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
+
+  .student-list { margin-top: 8px; }
+
+  .student-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .student-item .name { font-weight: 600; font-size: 14px; }
+  .student-item .id { font-size: 12px; color: var(--text-muted); }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-locked { background: #fde; color: var(--danger); }
+  .badge-active { background: #dff0e8; color: var(--success); }
+  .badge-done { background: #e8f0fe; color: var(--primary); }
+
+  .alert {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  .alert-info { background: #e8f0fe; color: #1a3a6b; border: 1px solid #b8ccf0; }
+  .alert-warn { background: #fff4e0; color: #7a4e00; border: 1px solid #f0d090; }
+  .alert-success { background: #dff0e8; color: #1a5a34; border: 1px solid #a8d8b8; }
+
+  /* ========== LOGIN PAGE ========== */
+  .login-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: linear-gradient(160deg, #0f2348 0%, #1a3a6b 50%, #2756a8 100%);
+  }
+
+  .login-logo {
+    text-align: center;
+    margin-bottom: 32px;
+    color: white;
+  }
+
+  .login-logo .icon { font-size: 52px; margin-bottom: 12px; }
+  .login-logo h2 { font-family: 'Kanit', sans-serif; font-size: 22px; font-weight: 700; }
+  .login-logo p { font-size: 14px; opacity: 0.75; margin-top: 4px; }
+
+  .login-card {
+    background: white;
+    border-radius: 20px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+  }
+
+  .login-card h3 {
+    font-family: 'Kanit', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  /* ========== EXAM PAGE ========== */
+  .exam-page { padding: 0 0 80px; max-width: 600px; margin: 0 auto; }
+
+  .exam-progress-bar {
+    height: 5px;
+    background: #d0d8e8;
+    position: sticky;
+    top: 56px;
+    z-index: 99;
+  }
+  .exam-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #f5c518);
+    transition: width 0.4s ease;
+  }
+
+  .exam-info-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: white;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-muted);
+    position: sticky;
+    top: 61px;
+    z-index: 99;
+  }
+
+  .exam-info-bar strong { color: var(--text); }
+
+  .warning-counter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .wc-0 { background: #dff0e8; color: var(--success); }
+  .wc-1 { background: #fff4e0; color: #c87000; }
+  .wc-2 { background: #fde; color: var(--danger); }
+
+  .question-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    margin: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+  }
+
+  .q-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .q-num-badge {
+    background: var(--primary);
+    color: white;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'Kanit', sans-serif;
+    flex-shrink: 0;
+  }
+
+  .q-text-main { font-size: 16px; font-weight: 500; line-height: 1.6; }
+
+  .choices { display: flex; flex-direction: column; gap: 10px; }
+
+  .choice-btn {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 13px 16px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+    width: 100%;
+    font-family: 'Sarabun', sans-serif;
+    font-size: 15px;
+    color: var(--text);
+  }
+
+  .choice-btn:hover { border-color: var(--primary-light); background: #eef3fb; }
+
+  .choice-btn.selected {
+    border-color: var(--primary);
+    background: #e4edf8;
+    color: var(--primary);
+  }
+
+  .choice-btn.selected .choice-key { background: var(--primary); color: white; }
+
+  .choice-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: white;
+    border: 1.5px solid var(--border);
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+
+  .nav-btns {
+    display: flex;
+    gap: 10px;
+    padding: 16px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid var(--border);
+    z-index: 100;
+  }
+
+  .nav-btns .btn { flex: 1; }
+
+  /* ========== RESULT PAGE ========== */
+  .result-page { padding: 20px 16px 40px; max-width: 500px; margin: 0 auto; text-align: center; }
+
+  .result-circle {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    margin: 24px auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .result-circle svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .result-circle .score-text {
+    font-family: 'Kanit', sans-serif;
+    font-size: 38px;
+    font-weight: 700;
+    color: var(--primary);
+    z-index: 1;
+  }
+  .result-circle .score-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    z-index: 1;
+  }
+
+  .result-grade {
+    font-family: 'Kanit', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    margin: 8px 0;
+  }
+
+  .result-summary {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin: 16px 0;
+    text-align: left;
+    box-shadow: var(--shadow);
+  }
+
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-row .label { color: var(--text-muted); }
+  .result-row .value { font-weight: 600; }
+  .result-row .correct { color: var(--success); }
+  .result-row .wrong { color: var(--danger); }
+
+  .review-list { margin-top: 16px; text-align: left; }
+
+  .review-item {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    border-left: 4px solid transparent;
+  }
+  .review-item.correct-item { border-left-color: var(--success); }
+  .review-item.wrong-item { border-left-color: var(--danger); }
+  .review-item .r-q { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .review-item .r-text { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.5; }
+  .review-item .r-ans { font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .r-correct { color: var(--success); }
+  .r-wrong { color: var(--danger); }
+
+  /* ========== LOCKED PAGE ========== */
+  .locked-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    background: linear-gradient(160deg, #3a0a0a, #8b1a1a);
+    color: white;
+    text-align: center;
+  }
+
+  .locked-page .lock-icon { font-size: 64px; margin-bottom: 20px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+  .locked-page h2 { font-family:'Kanit',sans-serif; font-size: 24px; font-weight:700; margin-bottom:12px; }
+  .locked-page p { font-size: 15px; opacity: 0.85; line-height: 1.6; margin-bottom:24px; }
+  .unlock-input { background: rgba(255,255,255,0.15); border: 1.5px solid rgba(255,255,255,0.3); color: white; border-radius:10px; padding:11px 16px; font-size:16px; text-align:center; letter-spacing:4px; width:180px; }
+  .unlock-input::placeholder { color: rgba(255,255,255,0.5); letter-spacing:1px; }
+  .unlock-input:focus { outline:none; background: rgba(255,255,255,0.22); }
+
+  /* Warning popup */
+  .warning-popup {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    animation: fadeIn 0.2s;
+  }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+  .warning-box {
+    background: white;
+    border-radius: 20px;
+    padding: 28px 24px;
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 12px 60px rgba(0,0,0,0.35);
+  }
+  .warning-box .warn-icon { font-size: 48px; margin-bottom: 12px; }
+  .warning-box h3 { font-family:'Kanit',sans-serif; font-size:18px; font-weight:700; margin-bottom:8px; color:var(--danger); }
+  .warning-box p { font-size: 14px; color: var(--text-muted); margin-bottom:20px; line-height:1.6; }
+
+  /* Tabs */
+  .tabs { display:flex; gap:4px; margin-bottom:16px; background:#eef3fb; border-radius:10px; padding:4px; }
+  .tab-btn { flex:1; padding:8px; border:none; border-radius:8px; font-family:'Kanit',sans-serif; font-size:13px; font-weight:600; cursor:pointer; background:transparent; color:var(--text-muted); transition:all 0.2s; }
+  .tab-btn.active { background:white; color:var(--primary); box-shadow: 0 1px 6px rgba(0,0,0,0.1); }
+
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  /* Mode switcher */
+  .mode-bar {
+    background: #eef3fb;
+    padding: 8px 16px;
+    display:flex; gap:8px; justify-content:flex-end;
+  }
+  .mode-btn {
+    padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600;
+    border:none; cursor:pointer; font-family:'Kanit',sans-serif;
+    background:white; color:var(--text-muted); transition:all 0.15s;
+  }
+  .mode-btn.active { background:var(--primary); color:white; }
+
+  .hidden { display:none!important; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #f0f4f8; }
+  ::-webkit-scrollbar-thumb { background: #b0bcd8; border-radius: 3px; }
+
+  @media (min-width: 600px) {
+    .choice-inputs { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ss-protect" id="ssProtect"></div>
+
+<!-- ===== HEADER ===== -->
+<div class="header" id="mainHeader">
+  <div>
+    <h1 id="headerTitle">📝 ระบบสอบออนไลน์</h1>
+    <div class="subtitle" id="headerSub">Thai Online Exam System</div>
+  </div>
+  <div>
+    <button class="btn btn-outline btn-sm" id="headerBtn" onclick="showAdminPanel()" style="width:auto;font-size:12px;padding:6px 12px;">⚙️ ผู้ดูแล</button>
+  </div>
+</div>
+
+<!-- ===== MODE BAR ===== -->
+<div class="mode-bar" id="modeBar">
+  <button class="mode-btn active" onclick="switchMode('admin')" id="modeBtnAdmin">🛠 จัดการ</button>
+  <button class="mode-btn" onclick="switchMode('exam')" id="modeBtnExam">📝 สอบ</button>
+</div>
+
+<!-- ===== ADMIN PAGE ===== -->
+<div class="page active admin-page" id="adminPage">
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('tabQuestions')">📋 ข้อสอบ</button>
+    <button class="tab-btn" onclick="switchTab('tabSettings')">⚙️ ตั้งค่า</button>
+    <button class="tab-btn" onclick="switchTab('tabMonitor')">👁 ติดตาม</button>
+  </div>
+
+  <!-- TAB: Questions -->
+  <div class="tab-panel active" id="tabQuestions">
+    <div class="section-card">
+      <div class="section-title">นำเข้าข้อสอบจากไฟล์</div>
+
+      <div class="alert alert-info">
+        📌 <strong>Excel/CSV:</strong> คอลัมน์ A=คำถาม, B=ก., C=ข., D=ค., E=ง., F=เฉลย (ก/ข/ค/ง)<br>
+        📌 <strong>Word (.docx):</strong> แต่ละข้อขึ้นบรรทัดใหม่ รูปแบบ: <em>คำถาม / ก.ตัวเลือก / ข.ตัวเลือก / ค.ตัวเลือก / ง.ตัวเลือก / เฉลย:ก</em>
+      </div>
+
+      <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt,.docx" onchange="handleFileUpload(event)">
+        <div class="icon">📁</div>
+        <p><strong>คลิกเพื่อเลือกไฟล์</strong></p>
+        <p>รองรับ .xlsx, .xls, .csv, .docx (Word)</p>
+      </div>
+
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline" onclick="downloadTemplate()" style="font-size:13px;flex:1;">⬇️ แม่แบบ Excel</button>
+        <button class="btn btn-outline" onclick="document.getElementById('rawTextViewer').classList.toggle('hidden')" style="font-size:13px;flex:1;">🔍 ดูข้อความดิบ</button>
+      </div>
+      <!-- Debug viewer -->
+      <div id="rawTextViewer" class="hidden" style="margin-top:14px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">ข้อความที่อ่านได้จากไฟล์ (raw):</div>
+        <textarea id="rawTextBox" readonly style="font-size:11px;height:180px;background:#f0f4f8;font-family:monospace;color:#333;"></textarea>
+        <button class="btn btn-sm btn-outline" style="margin-top:6px;" onclick="document.getElementById('rawTextViewer').classList.add('hidden')">ปิด</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title">เพิ่มข้อสอบด้วยตนเอง</div>
+      <button class="btn btn-outline" onclick="toggleAddForm()" style="margin-bottom:12px;">
+        ➕ เพิ่มข้อสอบใหม่
+      </button>
+
+      <div class="add-q-form hidden" id="addQForm">
+        <div class="form-group">
+          <label>คำถาม</label>
+          <textarea id="newQ" placeholder="พิมพ์คำถามที่นี่..."></textarea>
+        </div>
+        <div class="choice-inputs">
+          <div class="form-group">
+            <div class="choice-label">ก.</div>
+            <input type="text" id="choiceA" placeholder="ตัวเลือก ก.">
+          </div>
+          <div class="form-group">
+            <div class="choice-label">ข.</div>
+            <input type="text" id="choiceB" placeholder="ตัวเลือก ข.">
+          </div>
+          <div class="form-group">
+            <div class="choice-label">ค.</div>
+            <input type="text" id="choiceC" placeholder="ตัวเลือก ค.">
+          </div>
+          <div class="form-group">
+            <div class="choice-label">ง.</div>
+            <input type="text" id="choiceD" placeholder="ตัวเลือก ง.">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>เฉลย</label>
+          <select id="newAnswer">
+            <option value="ก">ก.</option>
+            <option value="ข">ข.</option>
+            <option value="ค">ค.</option>
+            <option value="ง">ง.</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-success" onclick="addQuestion()" style="flex:1">✔ บันทึก</button>
+          <button class="btn btn-outline" onclick="toggleAddForm()" style="flex:1">✕ ยกเลิก</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title">รายการข้อสอบ (<span id="qCount">0</span> ข้อ)</div>
+      <div id="questionList">
+        <p style="text-align:center;color:var(--text-muted);font-size:14px;padding:20px 0;">ยังไม่มีข้อสอบ</p>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="exportExcel()">📊 ส่งออก Excel</button>
+        <button class="btn btn-outline btn-sm" onclick="exportPrint()">🖨️ พิมพ์/PDF</button>
+        <button class="btn btn-danger btn-sm" onclick="clearQuestions()" style="margin-left:auto;">🗑 ลบทั้งหมด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Settings -->
+  <div class="tab-panel" id="tabSettings">
+    <div class="section-card">
+      <div class="section-title">ตั้งค่าการสอบ</div>
+      <div class="form-group">
+        <label>ชื่อวิชา / ชื่อการสอบ</label>
+        <input type="text" id="examTitle" value="แบบทดสอบ" placeholder="เช่น วิทยาศาสตร์ ม.3">
+      </div>
+      <div class="form-group">
+        <label>คะแนนเต็ม</label>
+        <input type="number" id="maxScore" value="100" min="1">
+      </div>
+      <div class="form-group">
+        <label>จำนวนครั้งที่ออกจากหน้าได้ (ก่อนล็อค)</label>
+        <select id="maxWarnings">
+          <option value="1">1 ครั้ง</option>
+          <option value="2" selected>2 ครั้ง</option>
+          <option value="3">3 ครั้ง</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>รหัสปลดล็อค (สำหรับผู้ดูแล)</label>
+        <input type="text" id="unlockCode" value="1234" placeholder="รหัส 4 หลัก">
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title">แชร์ข้อสอบให้นักเรียน</div>
+      <div class="alert alert-info">กด "สร้างลิงก์" เพื่อได้ URL ที่มีข้อสอบฝังอยู่แล้ว นักเรียนกดลิงก์เข้าสอบได้เลย ไม่ต้องนำเข้าไฟล์</div>
+      <button class="btn btn-accent" onclick="exportExamURL()">🔗 สร้างลิงก์สำหรับนักเรียน</button>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title">เริ่มการสอบ</div>
+      <div class="alert alert-warn" id="readyAlert">⚠️ กรุณาเพิ่มข้อสอบก่อนเริ่ม</div>
+      <button class="btn btn-accent" onclick="switchMode('exam')" id="startExamBtn">📝 ไปที่หน้าสอบ</button>
+    </div>
+  </div>
+
+  <!-- TAB: Monitor -->
+  <div class="tab-panel" id="tabMonitor">
+    <div class="section-card">
+      <div class="section-title">การสอบปัจจุบัน</div>
+      <div id="monitorInfo">
+        <p style="text-align:center;color:var(--text-muted);font-size:14px;padding:16px 0;">ยังไม่มีการสอบที่กำลังดำเนินการ</p>
+      </div>
+    </div>
+
+    <div class="section-card" id="lockedSection" style="display:none;">
+      <div class="section-title" style="color:var(--danger)">🔒 การสอบถูกล็อค</div>
+      <div class="alert alert-warn">นักเรียนออกจากหน้าจอสอบเกินกำหนด กรุณาปลดล็อค</div>
+      <div class="form-group">
+        <label>รหัสปลดล็อค</label>
+        <input type="text" id="adminUnlockInput" placeholder="ใส่รหัสปลดล็อค" maxlength="4">
+      </div>
+      <button class="btn btn-success" onclick="adminUnlock()">🔓 ปลดล็อคการสอบ</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== LOGIN PAGE ===== -->
+<div class="page" id="loginPage">
+  <div class="login-page">
+    <div class="login-logo">
+      <div class="icon">📝</div>
+      <h2 id="loginExamTitle">แบบทดสอบออนไลน์</h2>
+      <p>กรุณากรอกข้อมูลก่อนทำการสอบ</p>
+    </div>
+    <div class="login-card">
+      <h3>ข้อมูลผู้เข้าสอบ</h3>
+      <div class="form-group">
+        <label>ชื่อ</label>
+        <input type="text" id="studentFirstName" placeholder="กรอกชื่อ" maxlength="60">
+      </div>
+      <div class="form-group">
+        <label>นามสกุล</label>
+        <input type="text" id="studentLastName" placeholder="กรอกนามสกุล" maxlength="60">
+      </div>
+      <div class="form-group">
+        <label>สาขา</label>
+        <input type="text" id="studentBranch" placeholder="เช่น วิศวกรรมคอมพิวเตอร์" maxlength="60">
+      </div>
+      <button class="btn btn-primary" style="margin-top:8px;" onclick="startExam()">🚀 เริ่มทำข้อสอบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EXAM PAGE ===== -->
+<div class="page" id="examPage">
+  <div class="exam-progress-bar">
+    <div class="exam-progress-bar-fill" id="progressFill" style="width:0%"></div>
+  </div>
+  <div class="exam-info-bar">
+    <div>ข้อ <strong id="currentQNum">1</strong> / <strong id="totalQNum">0</strong></div>
+    <div class="warning-counter wc-0" id="warningCounter">
+      ✓ ออกจากหน้า: <strong id="warningCount">0</strong>/<strong id="maxWarn">2</strong>
+    </div>
+  </div>
+  <div class="exam-page">
+    <div class="question-card" id="questionCard"></div>
+  </div>
+  <div class="nav-btns">
+    <button class="btn btn-outline" id="prevBtn" onclick="prevQuestion()">◀ ก่อนหน้า</button>
+    <button class="btn btn-primary" id="nextBtn" onclick="nextQuestion()">ถัดไป ▶</button>
+    <button class="btn btn-accent hidden" id="submitBtn" onclick="submitExam()">📤 ส่งข้อสอบ</button>
+  </div>
+</div>
+
+<!-- ===== RESULT PAGE ===== -->
+<div class="page" id="resultPage">
+  <div class="result-page">
+    <h2 style="font-family:'Kanit',sans-serif;font-size:20px;font-weight:700;color:var(--primary);">📊 ผลการสอบ</h2>
+    <div class="result-circle" id="resultCircle">
+      <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="80" cy="80" r="70" fill="none" stroke="#e0e8f0" stroke-width="10"/>
+        <circle cx="80" cy="80" r="70" fill="none" stroke="#1a3a6b" stroke-width="10"
+          stroke-dasharray="439.8" stroke-dashoffset="439.8"
+          id="scoreCircle" style="transition:stroke-dashoffset 1.2s ease;"/>
+      </svg>
+      <div class="score-text" id="scoreText">0</div>
+      <div class="score-sub" id="scoreSub">คะแนน</div>
+    </div>
+    <div class="result-grade" id="resultGrade"></div>
+    <div class="result-summary" id="resultSummary"></div>
+    <div class="review-list" id="reviewList"></div>
+    <div style="margin-top:20px;">
+      <button class="btn btn-primary" onclick="restartExam()">🔄 ทำใหม่อีกครั้ง</button>
+      <button class="btn btn-outline" id="backAdminBtn" style="margin-top:10px;display:none;" onclick="showAdminPanel()">⚙️ กลับแผงผู้ดูแล</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LOCKED PAGE ===== -->
+<div class="page" id="lockedPage">
+  <div class="locked-page">
+    <div class="lock-icon">🔒</div>
+    <h2>การสอบถูกระงับ</h2>
+    <p>คุณออกจากหน้าจอสอบเกินจำนวนครั้งที่กำหนด<br>กรุณารอผู้ดูแลมาปลดล็อค</p>
+    <p style="font-size:13px;opacity:0.65;margin-bottom:16px;">หากเป็นผู้ดูแล ใส่รหัสปลดล็อคด้านล่าง</p>
+    <input type="text" class="unlock-input" id="unlockInput" placeholder="รหัส..." maxlength="4" inputmode="numeric">
+    <div style="margin-top:16px;">
+      <button class="btn btn-accent" onclick="tryUnlock()" style="width:auto;padding:11px 32px;">🔓 ปลดล็อค</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ADMIN LOGIN OVERLAY ===== -->
+<div id="adminLoginOverlay" style="display:none;position:fixed;inset:0;background:linear-gradient(160deg,#0f2348,#1a3a6b,#2756a8);z-index:99999;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:white;border-radius:20px;padding:28px 24px;width:100%;max-width:360px;box-shadow:0 8px 40px rgba(0,0,0,0.3);">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:40px;margin-bottom:8px;">🔐</div>
+      <div style="font-family:'Kanit',sans-serif;font-size:17px;font-weight:600;color:var(--primary);">เข้าสู่ระบบผู้ดูแล</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">กรุณาใส่รหัสผู้ดูแลเพื่อจัดการข้อสอบ</div>
+    </div>
+    <div class="form-group">
+      <label>รหัสผู้ดูแล</label>
+      <input type="password" id="adminLoginCode" placeholder="รหัส..." maxlength="20" onkeydown="if(event.key==='Enter')submitAdminLogin()">
+    </div>
+    <div id="adminLoginErr" style="color:var(--danger);font-size:13px;margin-bottom:10px;min-height:18px;"></div>
+    <button class="btn btn-primary" onclick="submitAdminLogin()">🔓 เข้าสู่ระบบ</button>
+    <button class="btn btn-outline" style="margin-top:10px;" onclick="document.getElementById('adminLoginOverlay').style.display='none';showPage('loginPage');document.getElementById('loginExamTitle').textContent=examSettings.title;">📝 ไปหน้าสอบแทน</button>
+  </div>
+</div>
+
+<!-- ===== EXPORT URL OVERLAY ===== -->
+<div id="exportUrlOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:20px;padding:24px;width:100%;max-width:500px;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+    <div style="font-family:'Kanit',sans-serif;font-size:16px;font-weight:600;color:var(--primary);margin-bottom:12px;">🔗 ลิงก์สำหรับนักเรียน</div>
+    <div class="alert alert-info" style="margin-bottom:12px;">นักเรียนกดลิงก์นี้จะเข้าสู่หน้าสอบโดยตรง ไม่เห็นหน้าผู้ดูแล</div>
+    <textarea id="exportUrlBox" readonly style="font-size:11px;height:100px;background:#f8fafc;word-break:break-all;margin-bottom:12px;font-family:monospace;"></textarea>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" id="copyUrlBtn" onclick="copyExamURL()" style="flex:2;">📋 คัดลอก URL</button>
+      <button class="btn btn-outline" onclick="document.getElementById('exportUrlOverlay').style.display='none'" style="flex:1;">ปิด</button>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--text-muted);">⚠️ หาก URL ยาวเกินไป แนะนำใช้บริการย่อ URL เช่น bit.ly</div>
+  </div>
+</div>
+
+<!-- ===== EDIT MODAL ===== -->
+<div id="editModalOverlay" class="edit-modal-overlay" style="display:none;">
+  <div class="edit-modal">
+    <h3>
+      ✏️ แก้ไขข้อสอบ
+      <button class="edit-modal-close" onclick="closeEditModal()">✕</button>
+    </h3>
+    <div class="form-group">
+      <label>คำถาม</label>
+      <textarea id="editQ" style="min-height:80px;"></textarea>
+    </div>
+    <div class="choice-inputs">
+      <div class="form-group">
+        <div class="choice-label">ก.</div>
+        <input type="text" id="editA">
+      </div>
+      <div class="form-group">
+        <div class="choice-label">ข.</div>
+        <input type="text" id="editB">
+      </div>
+      <div class="form-group">
+        <div class="choice-label">ค.</div>
+        <input type="text" id="editC">
+      </div>
+      <div class="form-group">
+        <div class="choice-label">ง.</div>
+        <input type="text" id="editD">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>เฉลย</label>
+      <select id="editAnswer">
+        <option value="ก">ก.</option>
+        <option value="ข">ข.</option>
+        <option value="ค">ค.</option>
+        <option value="ง">ง.</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-success" onclick="saveEditQuestion()" style="flex:2;">💾 บันทึก</button>
+      <button class="btn btn-outline" onclick="closeEditModal()" style="flex:1;">ยกเลิก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== WARNING POPUP ===== -->
+<div id="warningPopup" class="warning-popup" style="display:none;">
+  <div class="warning-box">
+    <div class="warn-icon">⚠️</div>
+    <h3 id="warnTitle">คำเตือน!</h3>
+    <p id="warnMsg">คุณออกจากหน้าจอสอบ</p>
+    <button class="btn btn-primary" onclick="dismissWarning()">✓ รับทราบ กลับสู่การสอบ</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let questions = [];
+let answers = {};
+let currentQ = 0;
+let warnings = 0;
+let maxWarnings = 2;
+let examActive = false;
+let examLocked = false;
+let examSettings = {
+  title: 'แบบทดสอบ',
+  maxScore: 100,
+  maxWarnings: 2,
+  unlockCode: '1234'
+};
+let student = {};
+let examResults = null;
+
+const choiceLabels = ['ก', 'ข', 'ค', 'ง'];
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  loadFromStorage();
+  renderQuestionList();
+  updateReadyAlert();
+  setupAntiCheat();
+}
+
+// ============================================================
+// INIT — ตรวจสอบ URL mode
+// ============================================================
+function init() {
+  // ตรวจว่ามี exam data ใน URL hash หรือไม่
+  const hash = window.location.hash;
+  if (hash && hash.startsWith('#exam=')) {
+    // โหมดนักเรียน: โหลดข้อสอบจาก URL
+    try {
+      const encoded = hash.slice(6);
+      const json = decodeURIComponent(atob(encoded));
+      const data = JSON.parse(json);
+      questions = data.questions || [];
+      examSettings = { ...examSettings, ...(data.settings || {}) };
+      maxWarnings = examSettings.maxWarnings;
+      // ซ่อนทุกอย่างที่เป็น admin — เข้าสู่โหมดสอบโดยตรง
+      document.getElementById('mainHeader').style.display = 'none';
+      document.getElementById('modeBar').style.display = 'none';
+      showPage('loginPage');
+      document.getElementById('loginExamTitle').textContent = examSettings.title;
+    } catch(e) {
+      alert('ลิงก์ข้อสอบไม่ถูกต้อง กรุณาตรวจสอบ URL');
+    }
+    setupAntiCheat();
+    return;
+  }
+
+  // โหมด admin: โหลดจาก localStorage ปกติ
+  loadFromStorage();
+  renderQuestionList();
+  updateReadyAlert();
+  setupAntiCheat();
+  checkAdminLogin();
+}
+
+// Admin login gate
+let isAdminLoggedIn = false;
+function checkAdminLogin() {
+  const saved = sessionStorage.getItem('admin_auth');
+  if (saved === examSettings.unlockCode) {
+    isAdminLoggedIn = true;
+    showPage('adminPage');
+  } else {
+    showAdminLoginPrompt();
+  }
+}
+
+function showAdminLoginPrompt() {
+  const overlay = document.getElementById('adminLoginOverlay');
+  overlay.style.display = 'flex';
+}
+
+function submitAdminLogin() {
+  const code = document.getElementById('adminLoginCode').value.trim();
+  if (code === examSettings.unlockCode) {
+    isAdminLoggedIn = true;
+    sessionStorage.setItem('admin_auth', code);
+    document.getElementById('adminLoginOverlay').style.display = 'none';
+    showPage('adminPage');
+  } else {
+    document.getElementById('adminLoginErr').textContent = '❌ รหัสไม่ถูกต้อง';
+    document.getElementById('adminLoginCode').value = '';
+  }
+}
+  const code = document.getElementById('adminLoginCode').value.trim();
+  if (code === examSettings.unlockCode) {
+    isAdminLoggedIn = true;
+    sessionStorage.setItem('admin_auth', code);
+    document.getElementById('adminLoginOverlay').style.display = 'none';
+    showPage('adminPage');
+  } else {
+    document.getElementById('adminLoginErr').textContent = '❌ รหัสไม่ถูกต้อง';
+    document.getElementById('adminLoginCode').value = '';
+  }
+}
+
+function loadFromStorage() {
+  try {
+    const q = localStorage.getItem('exam_questions');
+    if (q) questions = JSON.parse(q);
+    const s = localStorage.getItem('exam_settings');
+    if (s) examSettings = { ...examSettings, ...JSON.parse(s) };
+    applySettings();
+  } catch(e) {}
+}
+
+// Export ข้อสอบเป็น URL
+function exportExamURL() {
+  if (questions.length === 0) { alert('กรุณาเพิ่มข้อสอบก่อน'); return; }
+  try {
+    const data = { questions, settings: examSettings };
+    const json = JSON.stringify(data);
+    const encoded = btoa(encodeURIComponent(json));
+    const url = window.location.href.split('#')[0] + '#exam=' + encoded;
+
+    // แสดง popup URL
+    document.getElementById('exportUrlBox').value = url;
+    document.getElementById('exportUrlOverlay').style.display = 'flex';
+  } catch(e) {
+    alert('ข้อมูลใหญ่เกินไปสำหรับ URL กรุณาลดจำนวนข้อสอบลง');
+  }
+}
+
+function copyExamURL() {
+  const box = document.getElementById('exportUrlBox');
+  box.select();
+  box.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(box.value).then(() => {
+    document.getElementById('copyUrlBtn').textContent = '✅ คัดลอกแล้ว!';
+    setTimeout(() => { document.getElementById('copyUrlBtn').textContent = '📋 คัดลอก URL'; }, 2000);
+  }).catch(() => {
+    document.execCommand('copy');
+    alert('คัดลอก URL แล้ว!');
+  });
+}
+
+function saveToStorage() {
+  localStorage.setItem('exam_questions', JSON.stringify(questions));
+  localStorage.setItem('exam_settings', JSON.stringify(examSettings));
+}
+
+function applySettings() {
+  document.getElementById('examTitle').value = examSettings.title;
+  document.getElementById('maxScore').value = examSettings.maxScore;
+  document.getElementById('maxWarnings').value = examSettings.maxWarnings;
+  document.getElementById('unlockCode').value = examSettings.unlockCode;
+  maxWarnings = examSettings.maxWarnings;
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const isStudentMode = window.location.hash.startsWith('#exam=');
+  document.getElementById('modeBar').style.display = (id === 'adminPage' && !isStudentMode) ? 'flex' : 'none';
+  document.getElementById('mainHeader').style.display = (id === 'lockedPage' || id === 'loginPage' || isStudentMode) ? 'none' : 'flex';
+  document.getElementById('headerBtn').style.display = (id === 'examPage' || id === 'resultPage' || isStudentMode) ? 'none' : 'inline-flex';
+  // ปุ่มกลับแผงผู้ดูแล — แสดงเฉพาะโหมด admin
+  const backBtn = document.getElementById('backAdminBtn');
+  if (backBtn) backBtn.style.display = (!isStudentMode && id === 'resultPage') ? 'block' : 'none';
+}
+
+function showAdminPanel() {
+  if (!isAdminLoggedIn) { showAdminLoginPrompt(); return; }
+  showPage('adminPage');
+  switchMode('admin');
+}
+
+function switchMode(mode) {
+  document.getElementById('modeBtnAdmin').classList.toggle('active', mode === 'admin');
+  document.getElementById('modeBtnExam').classList.toggle('active', mode === 'exam');
+  if (mode === 'exam') {
+    if (questions.length === 0) { alert('กรุณาเพิ่มข้อสอบก่อน'); return; }
+    showPage('loginPage');
+    document.getElementById('loginExamTitle').textContent = examSettings.title;
+  } else {
+    showPage('adminPage');
+  }
+}
+
+function restartExam() {
+  // เคลียร์ฟอร์ม
+  document.getElementById('studentFirstName').value = '';
+  document.getElementById('studentLastName').value = '';
+  document.getElementById('studentBranch').value = '';
+  showPage('loginPage');
+  document.getElementById('loginExamTitle').textContent = examSettings.title;
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['tabQuestions','tabSettings','tabMonitor'][i] === tabId);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+}
+
+// ============================================================
+// QUESTIONS MANAGEMENT
+// ============================================================
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'xlsx' || ext === 'xls') {
+    readExcel(file);
+  } else if (ext === 'csv' || ext === 'txt') {
+    readCSV(file);
+  } else if (ext === 'docx') {
+    readWord(file);
+  }
+  e.target.value = '';
+}
+
+function readExcel(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'binary' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      let added = 0;
+      data.forEach((row, i) => {
+        if (i === 0 && typeof row[0] === 'string' && row[0].toLowerCase().includes('คำถาม')) return;
+        if (!row[0]) return;
+        const q = {
+          id: Date.now() + Math.random(),
+          text: String(row[0]).trim(),
+          choices: [
+            String(row[1] || '').trim(),
+            String(row[2] || '').trim(),
+            String(row[3] || '').trim(),
+            String(row[4] || '').trim()
+          ],
+          answer: String(row[5] || 'ก').trim().charAt(0)
+        };
+        if (q.text && q.choices[0]) { questions.push(q); added++; }
+      });
+      saveToStorage();
+      renderQuestionList();
+      updateReadyAlert();
+      alert(`✅ นำเข้าสำเร็จ ${added} ข้อ`);
+    } catch(err) {
+      alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message);
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function readWord(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const arrayBuffer = e.target.result;
+    // ใช้ทั้ง 2 วิธีพร้อมกัน แล้วเลือกผลที่ดีกว่า
+    Promise.all([
+      mammoth.extractRawText({ arrayBuffer }),
+      mammoth.convertToHtml({ arrayBuffer })
+    ]).then(([rawResult, htmlResult]) => {
+      const rawText = rawResult.value;
+      const htmlText = htmlToText(htmlResult.value);
+
+      // เก็บไว้ดู debug
+      document.getElementById('rawTextBox').value = rawText.slice(0, 3000);
+
+      // ลอง parse จาก raw text ก่อน (ดีกว่าสำหรับ paragraph ยาว)
+      let parsed = parseFromRawText(rawText);
+
+      // ถ้าได้น้อยเกินไป ลอง html แทน
+      if (parsed.length === 0) {
+        parsed = parseFromRawText(htmlText);
+      }
+
+      if (parsed.length > 0) {
+        parsed.forEach(q => questions.push(q));
+        saveToStorage();
+        renderQuestionList();
+        updateReadyAlert();
+        alert('✅ นำเข้าจาก Word สำเร็จ ' + parsed.length + ' ข้อ');
+      } else {
+        document.getElementById('rawTextViewer').classList.remove('hidden');
+        alert('⚠️ อ่านข้อสอบไม่ได้\nกด "ดูข้อความดิบ" เพื่อตรวจสอบ');
+      }
+    }).catch(err => alert('อ่านไฟล์ Word ไม่ได้: ' + err.message));
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function htmlToText(html) {
+  let h = html
+    .replace(/<\/td>/gi, '\n').replace(/<\/th>/gi, '\n')
+    .replace(/<\/tr>/gi, '\n').replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n').replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  return h;
+}
+
+// Parser หลัก: อ่านจาก raw text ที่อาจเป็นก้อนยาวๆ หรือจัด 2 คอลัมน์
+function parseFromRawText(rawText) {
+  const result = [];
+
+  // แทน pattern ข้อ N. ด้วย delimiter พิเศษ
+  // ระวัง: "2.2" หรือ "3.0" ต้องไม่ถูกตัด → ใช้ negative lookbehind digit
+  const marked = rawText.replace(/(?<!\d)(\d{1,3})\s*[.)]\s*(?=[ก-๙A-Za-z])/g, (m, num, offset) => {
+    const before = rawText.slice(Math.max(0, offset - 3), offset);
+    // ถ้าก่อนหน้าเป็น digit แสดงว่าเป็นทศนิยม เช่น 2.2
+    if (/\d/.test(before.slice(-1))) return m;
+    return `\x00Q${num}\x00`;
+  });
+
+  const blocks = marked.split(/\x00Q\d+\x00/).filter(b => b.trim().length > 5);
+
+  for (const block of blocks) {
+    const q = extractQFromBlock(block);
+    if (q) result.push(q);
+  }
+
+  // fallback line-by-line
+  if (result.length === 0) {
+    return parseLineByLine(rawText.split('\n').map(l => l.trim()).filter(l => l));
+  }
+
+  return result;
+}
+
+// แยก ก. ข. ค. ง. และเฉลยจาก block ของข้อเดียว
+function extractQFromBlock(block) {
+  const ansRe = /(เฉลย|คำตอบ|ตอบ)\s*[:\s.]*\s*([กขคง])/i;
+
+  // Step 1: normalize whitespace — รวมทุก newline/tab เป็น space ก่อน
+  // แต่ก่อนรวม ให้แทน newline ที่ตามด้วย ค./ง. ด้วย space
+  let b = block.replace(/\r/g, '');
+
+  // แทน tab ด้วย space
+  b = b.replace(/\t+/g, ' ');
+
+  // รวม multiple spaces เป็น space เดียว (ในบรรทัดเดียวกัน)
+  b = b.replace(/[ ]{2,}/g, ' ');
+
+  // รวม newline ทั้งหมดเป็น space — เพราะตัวเลือกอาจกระจายหลายบรรทัด
+  b = b.replace(/\n+/g, ' ').trim();
+
+  // Step 2: หาเฉลยและลบออกก่อน
+  let answer = 'ก';
+  const ansMatch = b.match(ansRe);
+  if (ansMatch) {
+    answer = ansMatch[2];
+    b = b.slice(0, ansMatch.index) + b.slice(ansMatch.index + ansMatch[0].length);
+    b = b.trim();
+  }
+
+  // Step 3: หาตำแหน่ง ก. แรกในข้อความ
+  // ใช้ indexOf แทน lookbehind เพื่อ Safari compatibility
+  const choiceStartRe = /[กขคง]\s*[.)\-]/g;
+  let firstMatch = null;
+  let m;
+  while ((m = choiceStartRe.exec(b)) !== null) {
+    if (['ก','ข','ค','ง'].includes(b[m.index])) {
+      firstMatch = m;
+      break;
+    }
+  }
+
+  if (!firstMatch) return null;
+
+  const qText = b.slice(0, firstMatch.index).trim().replace(/\s+/g, ' ');
+  const choicePart = b.slice(firstMatch.index);
+
+  // Step 4: แยกตัวเลือกโดย split ที่ตำแหน่งของ ก./ข./ค./ง.
+  // หาทุก index ของ [กขคง][.)-]
+  const markers = [];
+  const markerRe = /([กขคง])\s*[.)\-]\s*/g;
+  let mr;
+  while ((mr = markerRe.exec(choicePart)) !== null) {
+    if (['ก','ข','ค','ง'].includes(mr[1])) {
+      markers.push({ key: mr[1], start: mr.index, end: mr.index + mr[0].length });
+    }
+  }
+
+  const choiceMap = { ก: '', ข: '', ค: '', ง: '' };
+  for (let i = 0; i < markers.length; i++) {
+    const key = markers[i].key;
+    const textStart = markers[i].end;
+    const textEnd = i + 1 < markers.length ? markers[i + 1].start : choicePart.length;
+    const val = choicePart.slice(textStart, textEnd).trim().replace(/\s+/g, ' ');
+    if (val) choiceMap[key] = val;
+  }
+
+  if (!qText || !choiceMap['ก']) return null;
+
+  return {
+    id: Date.now() + Math.random(),
+    text: qText,
+    choices: [choiceMap['ก'], choiceMap['ข'], choiceMap['ค'], choiceMap['ง']],
+    answer
+  };
+}
+
+// fallback: parse line by line
+function parseLineByLine(lines) {
+  const result = [];
+  const choiceRe = /^[กขคง]\s*[.):\-]\s*/;
+  const answerRe = /^(เฉลย|คำตอบ|answer|ตอบ)\s*[:\s.]+\s*([กขคง])/i;
+  const numRe = /^(\d{1,3})\s*[.):\-]\s*/;
+
+  let qText = '', choices = [], answer = 'ก';
+  const flush = () => {
+    if (qText && choices.length >= 2) {
+      result.push({
+        id: Date.now() + Math.random(),
+        text: qText.trim(),
+        choices: [choices[0]||'', choices[1]||'', choices[2]||'', choices[3]||''],
+        answer
+      });
+    }
+    qText = ''; choices = []; answer = 'ก';
+  };
+
+  lines.forEach(line => {
+    if (answerRe.test(line)) {
+      const m = line.match(answerRe);
+      if (m) answer = m[2];
+    } else if (choiceRe.test(line)) {
+      choices.push(line.replace(choiceRe, '').trim());
+    } else if (numRe.test(line)) {
+      flush();
+      qText = line.replace(numRe, '').trim();
+      choices = []; answer = 'ก';
+    } else if (line.length > 3) {
+      if (choices.length >= 4) { flush(); qText = line; choices = []; answer = 'ก'; }
+      else if (!qText) qText = line;
+      else if (choices.length === 0) qText += ' ' + line;
+    }
+  });
+  flush();
+  return result;
+}
+
+function readCSV(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const lines = e.target.result.split('\n');
+    let added = 0;
+    lines.forEach((line, i) => {
+      const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g,''));
+      if (!cols[0] || cols[0].toLowerCase().includes('คำถาม')) return;
+      const q = {
+        id: Date.now() + Math.random(),
+        text: cols[0],
+        choices: [cols[1]||'', cols[2]||'', cols[3]||'', cols[4]||''],
+        answer: (cols[5]||'ก').charAt(0)
+      };
+      if (q.text && q.choices[0]) { questions.push(q); added++; }
+    });
+    saveToStorage();
+    renderQuestionList();
+    updateReadyAlert();
+    alert(`✅ นำเข้าสำเร็จ ${added} ข้อ`);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function downloadTemplate() {
+  const data = [
+    ['คำถาม','ก.','ข.','ค.','ง.','เฉลย'],
+    ['กรุงเทพมหานครเป็นเมืองหลวงของประเทศใด','ไทย','ลาว','เวียดนาม','พม่า','ก'],
+    ['2 + 2 = ?','3','4','5','6','ข'],
+    ['ดวงอาทิตย์อยู่ในระบบอะไร','จักรวาล','กาแล็กซีทางช้างเผือก','ระบบสุริยะ','เนบิวลา','ค'],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ข้อสอบ');
+  XLSX.writeFile(wb, 'template_exam.xlsx');
+}
+
+function exportExcel() {
+  if (questions.length === 0) { alert('ยังไม่มีข้อสอบ'); return; }
+  const header = ['ข้อที่', 'คำถาม', 'ก.', 'ข.', 'ค.', 'ง.', 'เฉลย'];
+  const rows = questions.map((q, i) => [
+    i + 1,
+    q.text,
+    q.choices[0] || '',
+    q.choices[1] || '',
+    q.choices[2] || '',
+    q.choices[3] || '',
+    q.answer + '.'
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+
+  // ปรับความกว้างคอลัมน์
+  ws['!cols'] = [
+    { wch: 6 }, { wch: 50 }, { wch: 20 }, { wch: 20 },
+    { wch: 20 }, { wch: 20 }, { wch: 8 }
+  ];
+
+  // สีหัวตาราง
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
+    if (cell) {
+      cell.s = {
+        fill: { fgColor: { rgb: '1a3a6b' } },
+        font: { color: { rgb: 'FFFFFF' }, bold: true },
+        alignment: { horizontal: 'center' }
+      };
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ข้อสอบ');
+  const title = (examSettings.title || 'แบบทดสอบ').replace(/[\/\\:*?"<>|]/g, '_');
+  XLSX.writeFile(wb, title + '_ข้อสอบ.xlsx');
+}
+
+function exportPrint() {
+  if (questions.length === 0) { alert('ยังไม่มีข้อสอบ'); return; }
+  const title = examSettings.title || 'แบบทดสอบ';
+  const choiceLabelsLocal = ['ก', 'ข', 'ค', 'ง'];
+
+  const qHtml = questions.map((q, i) => `
+    <div class="pq">
+      <div class="pq-num">ข้อที่ ${i + 1}.</div>
+      <div class="pq-text">${q.text}</div>
+      <div class="pq-choices">
+        ${q.choices.map((c, ci) => `
+          <div class="pq-choice ${q.answer === choiceLabelsLocal[ci] ? 'correct' : ''}">
+            <span class="pq-key">${choiceLabelsLocal[ci]}.</span> ${c || '-'}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  const printWin = window.open('', '_blank');
+  printWin.document.write(`<!DOCTYPE html><html lang="th"><head>
+  <meta charset="UTF-8">
+  <title>${title}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=Kanit:wght@600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Sarabun', sans-serif; font-size: 14px; color: #111; padding: 24px 32px; }
+    h1 { font-family: 'Kanit', sans-serif; font-size: 20px; text-align: center; margin-bottom: 4px; }
+    .meta { text-align: center; font-size: 13px; color: #555; margin-bottom: 24px; }
+    .pq { margin-bottom: 20px; page-break-inside: avoid; }
+    .pq-num { font-weight: 700; color: #1a3a6b; margin-bottom: 4px; }
+    .pq-text { margin-bottom: 8px; line-height: 1.6; }
+    .pq-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; padding-left: 12px; }
+    .pq-choice { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; }
+    .pq-key { font-weight: 700; min-width: 18px; color: #1a3a6b; }
+    .correct .pq-key { color: #1a7a4a; }
+    .answer-key { margin-top: 32px; border-top: 2px solid #1a3a6b; padding-top: 16px; }
+    .answer-key h2 { font-family: 'Kanit', sans-serif; font-size: 15px; margin-bottom: 10px; }
+    .answer-grid { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+    .answer-item { font-size: 13px; min-width: 80px; }
+    .answer-item strong { color: #1a7a4a; }
+    @media print {
+      body { padding: 12px 20px; }
+      .no-print { display: none; }
+    }
+  </style></head><body>
+  <h1>${title}</h1>
+  <div class="meta">จำนวน ${questions.length} ข้อ | คะแนนเต็ม ${examSettings.maxScore} คะแนน</div>
+  <button class="no-print" onclick="window.print()" style="display:block;margin:0 auto 20px;padding:10px 28px;background:#1a3a6b;color:white;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-family:Sarabun,sans-serif;">🖨️ พิมพ์ / บันทึก PDF</button>
+  ${qHtml}
+  <div class="answer-key">
+    <h2>เฉลย</h2>
+    <div class="answer-grid">
+      ${questions.map((q, i) => `<div class="answer-item">ข้อ ${i+1}: <strong>${q.answer}.</strong></div>`).join('')}
+    </div>
+  </div>
+  </body></html>`);
+  printWin.document.close();
+  printWin.focus();
+}
+
+function toggleAddForm() {
+  const f = document.getElementById('addQForm');
+  f.classList.toggle('hidden');
+}
+
+function addQuestion() {
+  const text = document.getElementById('newQ').value.trim();
+  const a = document.getElementById('choiceA').value.trim();
+  const b = document.getElementById('choiceB').value.trim();
+  const c = document.getElementById('choiceC').value.trim();
+  const d = document.getElementById('choiceD').value.trim();
+  const ans = document.getElementById('newAnswer').value;
+  if (!text || !a || !b || !c || !d) { alert('กรุณากรอกข้อมูลให้ครบ'); return; }
+  questions.push({ id: Date.now(), text, choices: [a,b,c,d], answer: ans });
+  saveToStorage();
+  renderQuestionList();
+  updateReadyAlert();
+  document.getElementById('newQ').value = '';
+  document.getElementById('choiceA').value = '';
+  document.getElementById('choiceB').value = '';
+  document.getElementById('choiceC').value = '';
+  document.getElementById('choiceD').value = '';
+  toggleAddForm();
+}
+
+let editingId = null;
+
+function openEditModal(id) {
+  const q = questions.find(q => q.id === id);
+  if (!q) return;
+  editingId = id;
+  document.getElementById('editQ').value = q.text;
+  document.getElementById('editA').value = q.choices[0] || '';
+  document.getElementById('editB').value = q.choices[1] || '';
+  document.getElementById('editC').value = q.choices[2] || '';
+  document.getElementById('editD').value = q.choices[3] || '';
+  document.getElementById('editAnswer').value = q.answer;
+  document.getElementById('editModalOverlay').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('editModalOverlay').style.display = 'none';
+  editingId = null;
+}
+
+function saveEditQuestion() {
+  if (!editingId) return;
+  const idx = questions.findIndex(q => q.id === editingId);
+  if (idx === -1) return;
+  const text = document.getElementById('editQ').value.trim();
+  const a = document.getElementById('editA').value.trim();
+  const b = document.getElementById('editB').value.trim();
+  const c = document.getElementById('editC').value.trim();
+  const d = document.getElementById('editD').value.trim();
+  const ans = document.getElementById('editAnswer').value;
+  if (!text || !a || !b) { alert('กรุณากรอกคำถามและตัวเลือก ก. ข. อย่างน้อย'); return; }
+  questions[idx] = { ...questions[idx], text, choices: [a, b, c, d], answer: ans };
+  saveToStorage();
+  renderQuestionList();
+  closeEditModal();
+}
+
+// ปิด modal เมื่อกดพื้นที่นอก
+document.addEventListener('click', function(e) {
+  const overlay = document.getElementById('editModalOverlay');
+  if (e.target === overlay) closeEditModal();
+});
+
+function deleteQuestion(id) {
+  questions = questions.filter(q => q.id !== id);
+  saveToStorage();
+  renderQuestionList();
+  updateReadyAlert();
+}
+
+function clearQuestions() {
+  if (!confirm('ต้องการลบข้อสอบทั้งหมดใช่หรือไม่?')) return;
+  questions = [];
+  saveToStorage();
+  renderQuestionList();
+  updateReadyAlert();
+}
+
+function renderQuestionList() {
+  const el = document.getElementById('questionList');
+  document.getElementById('qCount').textContent = questions.length;
+  if (questions.length === 0) {
+    el.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:14px;padding:20px 0;">ยังไม่มีข้อสอบ</p>';
+    return;
+  }
+  el.innerHTML = questions.map((q,i) => `
+    <div class="question-item">
+      <button class="q-edit" onclick="openEditModal(${q.id})">✏️</button>
+      <button class="q-delete" onclick="deleteQuestion(${q.id})">✕</button>
+      <div class="q-num">ข้อที่ ${i+1}</div>
+      <div class="q-text">${q.text}</div>
+      <div class="q-choices">
+        <span>ก. ${q.choices[0]||'-'}</span>
+        <span>ข. ${q.choices[1]||'-'}</span>
+        <span>ค. ${q.choices[2]||'-'}</span>
+        <span>ง. ${q.choices[3]||'-'}</span>
+      </div>
+      <div class="q-answer">✓ เฉลย: ${q.answer}. ${q.choices[choiceLabels.indexOf(q.answer)]||''}</div>
+    </div>
+  `).join('');
+}
+
+function updateReadyAlert() {
+  const alert = document.getElementById('readyAlert');
+  if (questions.length > 0) {
+    alert.className = 'alert alert-success';
+    alert.textContent = `✅ พร้อมสอบ: ${questions.length} ข้อ`;
+  } else {
+    alert.className = 'alert alert-warn';
+    alert.textContent = '⚠️ กรุณาเพิ่มข้อสอบก่อนเริ่ม';
+  }
+}
+
+function saveSettings() {
+  examSettings.title = document.getElementById('examTitle').value || 'แบบทดสอบ';
+  examSettings.maxScore = parseInt(document.getElementById('maxScore').value) || 100;
+  examSettings.maxWarnings = parseInt(document.getElementById('maxWarnings').value);
+  examSettings.unlockCode = document.getElementById('unlockCode').value || '1234';
+  maxWarnings = examSettings.maxWarnings;
+  saveToStorage();
+  alert('✅ บันทึกการตั้งค่าแล้ว');
+}
+
+// ============================================================
+// EXAM FLOW
+// ============================================================
+function startExam() {
+  const firstName = document.getElementById('studentFirstName').value.trim();
+  const lastName = document.getElementById('studentLastName').value.trim();
+  const branch = document.getElementById('studentBranch').value.trim();
+  if (!firstName || !lastName) { alert('กรุณากรอกชื่อและนามสกุล'); return; }
+  if (!branch) { alert('กรุณากรอกสาขา'); return; }
+  student = { name: firstName + ' ' + lastName, firstName, lastName, branch };
+  answers = {};
+  currentQ = 0;
+  warnings = 0;
+  examLocked = false;
+  examActive = true;
+  maxWarnings = examSettings.maxWarnings;
+  document.body.classList.add('exam-active');
+  document.getElementById('totalQNum').textContent = questions.length;
+  document.getElementById('maxWarn').textContent = maxWarnings;
+  updateMonitor();
+  showPage('examPage');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = questions[currentQ];
+  document.getElementById('currentQNum').textContent = currentQ + 1;
+  document.getElementById('totalQNum').textContent = questions.length;
+  const pct = ((currentQ) / questions.length * 100).toFixed(0);
+  document.getElementById('progressFill').style.width = pct + '%';
+
+  // Warning counter style
+  const wc = document.getElementById('warningCounter');
+  document.getElementById('warningCount').textContent = warnings;
+  wc.className = 'warning-counter wc-' + Math.min(warnings, 2);
+  if (warnings === 0) wc.innerHTML = `✓ ออกจากหน้า: <strong>${warnings}</strong>/<strong>${maxWarnings}</strong>`;
+  else if (warnings === 1) wc.innerHTML = `⚠️ ออกจากหน้า: <strong>${warnings}</strong>/<strong>${maxWarnings}</strong>`;
+  else wc.innerHTML = `🚨 ออกจากหน้า: <strong>${warnings}</strong>/<strong>${maxWarnings}</strong>`;
+
+  const selected = answers[q.id] ?? null;
+  document.getElementById('questionCard').innerHTML = `
+    <div class="q-header">
+      <span class="q-num-badge">ข้อ ${currentQ+1}</span>
+      <div class="q-text-main">${q.text}</div>
+    </div>
+    <div class="choices">
+      ${q.choices.map((c,i) => `
+        <button class="choice-btn ${selected === i ? 'selected' : ''}" onclick="selectAnswer(${i})">
+          <span class="choice-key">${choiceLabels[i]}</span>
+          <span>${c}</span>
+        </button>
+      `).join('')}
+    </div>
+  `;
+
+  // Nav buttons
+  document.getElementById('prevBtn').style.visibility = currentQ > 0 ? 'visible' : 'hidden';
+  const isLast = currentQ === questions.length - 1;
+  document.getElementById('nextBtn').classList.toggle('hidden', isLast);
+  document.getElementById('submitBtn').classList.toggle('hidden', !isLast);
+}
+
+function selectAnswer(idx) {
+  const q = questions[currentQ];
+  answers[q.id] = idx;
+  renderQuestion();
+}
+
+function nextQuestion() {
+  if (currentQ < questions.length - 1) { currentQ++; renderQuestion(); }
+}
+
+function prevQuestion() {
+  if (currentQ > 0) { currentQ--; renderQuestion(); }
+}
+
+function submitExam() {
+  const unanswered = questions.filter(q => answers[q.id] === undefined).length;
+  if (unanswered > 0) {
+    if (!confirm(`ยังมี ${unanswered} ข้อที่ยังไม่ได้ตอบ\nต้องการส่งข้อสอบใช่หรือไม่?`)) return;
+  }
+  examActive = false;
+  document.body.classList.remove('exam-active');
+  calculateResult();
+}
+
+function calculateResult() {
+  let correct = 0;
+  const detail = questions.map((q, i) => {
+    const selIdx = answers[q.id];
+    const sel = selIdx !== undefined ? choiceLabels[selIdx] : null;
+    const isCorrect = sel === q.answer;
+    if (isCorrect) correct++;
+    return { q, sel, isCorrect, selIdx };
+  });
+
+  const pct = questions.length > 0 ? (correct / questions.length) : 0;
+  const score = Math.round(pct * examSettings.maxScore);
+
+  examResults = { correct, total: questions.length, score, pct, detail };
+  showResult(examResults);
+}
+
+function showResult(r) {
+  showPage('resultPage');
+  document.getElementById('scoreText').textContent = r.score;
+  document.getElementById('scoreSub').textContent = `/ ${examSettings.maxScore}`;
+
+  // Animate circle
+  setTimeout(() => {
+    const circumference = 2 * Math.PI * 70;
+    const offset = circumference - r.pct * circumference;
+    const circle = document.getElementById('scoreCircle');
+    circle.style.strokeDashoffset = offset;
+    // Color by score
+    if (r.pct >= 0.8) circle.style.stroke = '#1a7a4a';
+    else if (r.pct >= 0.6) circle.style.stroke = '#e8a020';
+    else circle.style.stroke = '#c0392b';
+  }, 200);
+
+  // Grade
+  let grade = '', gradeColor = '';
+  if (r.pct >= 0.9) { grade = 'ยอดเยี่ยม! 🏆'; gradeColor = '#1a7a4a'; }
+  else if (r.pct >= 0.8) { grade = 'ดีมาก! 🌟'; gradeColor = '#2756a8'; }
+  else if (r.pct >= 0.7) { grade = 'ดี 👍'; gradeColor = '#2756a8'; }
+  else if (r.pct >= 0.6) { grade = 'พอใช้ 📖'; gradeColor = '#e8a020'; }
+  else { grade = 'ต้องพัฒนา 📚'; gradeColor = '#c0392b'; }
+
+  document.getElementById('resultGrade').textContent = grade;
+  document.getElementById('resultGrade').style.color = gradeColor;
+
+  document.getElementById('resultSummary').innerHTML = `
+    <div class="result-row"><span class="label">ชื่อ-นามสกุล</span><span class="value">${student.name}</span></div>
+    <div class="result-row"><span class="label">สาขา</span><span class="value">${student.branch||'-'}</span></div>
+    <div class="result-row"><span class="label">ข้อสอบ</span><span class="value">${examSettings.title}</span></div>
+    <div class="result-row"><span class="label">ตอบถูก</span><span class="value correct">${r.correct} ข้อ</span></div>
+    <div class="result-row"><span class="label">ตอบผิด</span><span class="value wrong">${r.total - r.correct} ข้อ</span></div>
+    <div class="result-row"><span class="label">คะแนนที่ได้</span><span class="value" style="font-size:18px;color:var(--primary)">${r.score} / ${examSettings.maxScore}</span></div>
+    <div class="result-row"><span class="label">คิดเป็น</span><span class="value">${(r.pct*100).toFixed(1)}%</span></div>
+    <div class="result-row"><span class="label">ออกจากหน้า</span><span class="value">${warnings} ครั้ง</span></div>
+  `;
+
+  document.getElementById('reviewList').innerHTML = '<div style="font-family:\'Kanit\',sans-serif;font-size:15px;font-weight:600;margin-bottom:12px;color:var(--primary);">รายละเอียดแต่ละข้อ</div>' +
+    r.detail.map((d,i) => `
+      <div class="review-item ${d.isCorrect ? 'correct-item' : 'wrong-item'}">
+        <div class="r-q">ข้อ ${i+1} ${d.isCorrect ? '✅' : '❌'}</div>
+        <div class="r-text">${d.q.text}</div>
+        <div class="r-ans">
+          ${d.sel ? `<span class="${d.isCorrect ? 'r-correct' : 'r-wrong'}">คำตอบของคุณ: ${d.sel}. ${d.q.choices[d.selIdx] || ''}</span>` : '<span style="color:var(--text-muted)">ไม่ได้ตอบ</span>'}
+          ${!d.isCorrect ? `<span class="r-correct">เฉลย: ${d.q.answer}. ${d.q.choices[choiceLabels.indexOf(d.q.answer)] || ''}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+}
+
+
+// ============================================================
+// ANTI-CHEAT
+// ============================================================
+function setupAntiCheat() {
+  // Visibility change (switch app / minimize)
+  document.addEventListener('visibilitychange', () => {
+    if (!examActive || examLocked) return;
+    if (document.hidden) {
+      handleViolation();
+    }
+  });
+
+  // Blur (switch tab / app on some browsers)
+  window.addEventListener('blur', () => {
+    if (!examActive || examLocked || document.hidden) return;
+    handleViolation();
+  });
+
+  // Screenshot prevention: CSS hack (not 100% but helps)
+  // On screenshot attempt, flash white screen
+  document.addEventListener('keyup', (e) => {
+    // Windows: PrintScreen, Mac: Cmd+Shift+3/4/5
+    if (e.key === 'PrintScreen' || (e.metaKey && e.shiftKey && ['3','4','5','s'].includes(e.key))) {
+      flashProtect();
+    }
+  });
+
+  // Prevent right-click
+  document.addEventListener('contextmenu', e => {
+    if (examActive) e.preventDefault();
+  });
+
+  // Prevent select & drag
+  document.addEventListener('selectstart', e => {
+    if (examActive) e.preventDefault();
+  });
+}
+
+let flashTimeout;
+function flashProtect() {
+  const el = document.getElementById('ssProtect');
+  el.style.background = 'white';
+  clearTimeout(flashTimeout);
+  flashTimeout = setTimeout(() => { el.style.background = 'transparent'; }, 500);
+}
+
+function handleViolation() {
+  if (!examActive || examLocked) return;
+  warnings++;
+  document.getElementById('warningCount').textContent = warnings;
+  updateMonitor();
+
+  if (warnings >= maxWarnings + 1) {
+    lockExam();
+  } else {
+    showWarningPopup(warnings, maxWarnings);
+  }
+}
+
+function showWarningPopup(count, max) {
+  const remaining = max - count;
+  document.getElementById('warnTitle').textContent = `⚠️ คำเตือนครั้งที่ ${count}!`;
+  document.getElementById('warnMsg').textContent =
+    remaining > 0
+      ? `คุณออกจากหน้าจอสอบ\nเหลือโอกาสอีก ${remaining} ครั้ง หากออกอีกครั้งการสอบจะถูกล็อค`
+      : `คุณออกจากหน้าจอสอบครบ ${max} ครั้งแล้ว\nนี่คือครั้งสุดท้าย หากออกอีกการสอบจะถูกล็อคทันที!`;
+  document.getElementById('warningPopup').style.display = 'flex';
+}
+
+function dismissWarning() {
+  document.getElementById('warningPopup').style.display = 'none';
+}
+
+function lockExam() {
+  examLocked = true;
+  examActive = false;
+  document.getElementById('warningPopup').style.display = 'none';
+  document.body.classList.remove('exam-active');
+  showPage('lockedPage');
+  updateMonitor(true);
+}
+
+function tryUnlock() {
+  const code = document.getElementById('unlockInput').value.trim();
+  if (code === examSettings.unlockCode) {
+    unlockExam();
+  } else {
+    alert('รหัสไม่ถูกต้อง');
+    document.getElementById('unlockInput').value = '';
+  }
+}
+
+function adminUnlock() {
+  const code = document.getElementById('adminUnlockInput').value.trim();
+  if (code === examSettings.unlockCode) {
+    unlockExam();
+    switchTab('tabMonitor');
+  } else {
+    alert('รหัสไม่ถูกต้อง');
+  }
+}
+
+function unlockExam() {
+  examLocked = false;
+  examActive = true;
+  warnings = maxWarnings; // still at limit but allows continuing
+  document.body.classList.add('exam-active');
+  document.getElementById('lockedSection').style.display = 'none';
+  showPage('examPage');
+  renderQuestion();
+  updateMonitor();
+  alert('🔓 ปลดล็อคแล้ว นักเรียนสามารถทำข้อสอบต่อได้');
+}
+
+// ============================================================
+// MONITOR
+// ============================================================
+function updateMonitor(locked = false) {
+  const el = document.getElementById('monitorInfo');
+  const ls = document.getElementById('lockedSection');
+  if (!student.name) return;
+
+  el.innerHTML = `
+    <div class="student-item">
+      <div>
+        <div class="name">${student.name}</div>
+        <div class="id">สาขา: ${student.branch||'-'}</div>
+      </div>
+      <span class="badge ${locked || examLocked ? 'badge-locked' : (examActive ? 'badge-active' : 'badge-done')}">
+        ${locked || examLocked ? '🔒 ล็อค' : (examActive ? '🟢 สอบอยู่' : '✅ เสร็จแล้ว')}
+      </span>
+    </div>
+    <div style="display:flex;gap:8px;font-size:13px;margin-top:8px;">
+      <span>ข้อที่: <strong>${currentQ+1}/${questions.length}</strong></span>
+      <span>ออกหน้า: <strong style="color:${warnings>0?'var(--danger)':'var(--success)'}">${warnings}/${maxWarnings}</strong></span>
+    </div>
+  `;
+
+  if (locked || examLocked) {
+    ls.style.display = 'block';
+  } else {
+    ls.style.display = 'none';
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+init();
+</script>
+</body>
+</html>
