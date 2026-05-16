@@ -417,13 +417,13 @@
   }
 
   /* ========== EXAM PAGE ========== */
-  .exam-page { padding: 0 0 80px; max-width: 600px; margin: 0 auto; }
+  .exam-page { padding: 0 0 100px; max-width: 600px; margin: 0 auto; }
 
   .exam-progress-bar {
     height: 5px;
     background: #d0d8e8;
     position: sticky;
-    top: 56px;
+    top: 0;
     z-index: 99;
   }
   .exam-progress-bar-fill {
@@ -436,13 +436,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 16px;
+    padding: 8px 12px;
     background: white;
     border-bottom: 1px solid var(--border);
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-muted);
     position: sticky;
-    top: 61px;
+    top: 5px;
     z-index: 99;
   }
 
@@ -451,11 +451,12 @@
   .warning-counter {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
+    gap: 4px;
+    padding: 4px 8px;
     border-radius: 20px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
+    white-space: nowrap;
   }
   .wc-0 { background: #dff0e8; color: var(--success); }
   .wc-1 { background: #fff4e0; color: #c87000; }
@@ -464,8 +465,8 @@
   .question-card {
     background: var(--card);
     border-radius: var(--radius);
-    margin: 16px;
-    padding: 20px;
+    margin: 12px;
+    padding: 16px;
     box-shadow: var(--shadow);
     border: 1px solid var(--border);
   }
@@ -473,8 +474,8 @@
   .q-header {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 14px;
   }
 
   .q-num-badge {
@@ -482,21 +483,27 @@
     color: white;
     border-radius: 8px;
     padding: 4px 10px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     font-family: 'Kanit', sans-serif;
     flex-shrink: 0;
   }
 
-  .q-text-main { font-size: 16px; font-weight: 500; line-height: 1.6; }
+  .q-text-main {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.6;
+    word-break: break-word;
+    flex: 1;
+  }
 
-  .choices { display: flex; flex-direction: column; gap: 10px; }
+  .choices { display: flex; flex-direction: column; gap: 8px; }
 
   .choice-btn {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    padding: 13px 16px;
+    gap: 10px;
+    padding: 12px 14px;
     border: 2px solid var(--border);
     border-radius: 12px;
     background: #f8fafc;
@@ -505,11 +512,15 @@
     text-align: left;
     width: 100%;
     font-family: 'Sarabun', sans-serif;
-    font-size: 15px;
+    font-size: 14px;
     color: var(--text);
+    line-height: 1.5;
+    word-break: break-word;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
-  .choice-btn:hover { border-color: var(--primary-light); background: #eef3fb; }
+  .choice-btn:active { transform: scale(0.98); background: #eef3fb; }
 
   .choice-btn.selected {
     border-color: var(--primary);
@@ -523,6 +534,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-width: 28px;
     width: 28px;
     height: 28px;
     border-radius: 50%;
@@ -532,12 +544,14 @@
     font-size: 13px;
     flex-shrink: 0;
     transition: all 0.15s;
+    margin-top: 1px;
   }
 
   .nav-btns {
     display: flex;
-    gap: 10px;
-    padding: 16px;
+    gap: 8px;
+    padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
     position: fixed;
     bottom: 0;
     left: 0;
@@ -545,9 +559,10 @@
     background: white;
     border-top: 1px solid var(--border);
     z-index: 100;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
   }
 
-  .nav-btns .btn { flex: 1; }
+  .nav-btns .btn { flex: 1; padding: 12px 8px; font-size: 14px; }
 
   /* ========== RESULT PAGE ========== */
   .result-page { padding: 20px 16px 40px; max-width: 500px; margin: 0 auto; text-align: center; }
@@ -863,7 +878,7 @@
       <div style="margin-top:14px;">
         <div class="section-title" style="margin-bottom:10px;">ตั้งค่าสาขาให้นักเรียนเลือก</div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">ใส่ชื่อสาขาแต่ละบรรทัด</div>
-        <textarea id="branchList" rows="6" placeholder="มาบตาพุด&#10;ระยอง&#10;ปลวกแดง&#10;บ้านฉาง&#10;พัทยา&#10;ชลบุรี"></textarea>
+        <textarea id="branchList" rows="8" placeholder="มาบตาพุด&#10;ระยอง&#10;บ้านค่าย&#10;นิคมพัฒนา&#10;โรงงานระยอง&#10;โรงงานปลวกแดง&#10;ซีเค&#10;ปลวกแดง"></textarea>
         <button class="btn btn-outline" style="margin-top:8px;font-size:13px;" onclick="saveBranches()">💾 บันทึกรายชื่อสาขา</button>
       </div>
     </div>
@@ -937,12 +952,12 @@
           <option value="">-- เลือกสาขา --</option>
           <option>มาบตาพุด</option>
           <option>ระยอง</option>
+          <option>บ้านค่าย</option>
+          <option>นิคมพัฒนา</option>
+          <option>โรงงานระยอง</option>
+          <option>โรงงานปลวกแดง</option>
+          <option>ซีเค</option>
           <option>ปลวกแดง</option>
-          <option>บ้านฉาง</option>
-          <option>พัทยา</option>
-          <option>ชลบุรี</option>
-          <option>ศรีราชา</option>
-          <option>อื่นๆ</option>
         </select>
       </div>
       <button class="btn btn-primary" style="margin-top:8px;" onclick="startExam()">🚀 เริ่มทำข้อสอบ</button>
@@ -951,7 +966,7 @@
 </div>
 
 <!-- ===== EXAM PAGE ===== -->
-<div class="page" id="examPage">
+<div class="page" id="examPage" style="overflow-y:auto;-webkit-overflow-scrolling:touch;">
   <div class="exam-progress-bar">
     <div class="exam-progress-bar-fill" id="progressFill" style="width:0%"></div>
   </div>
@@ -1920,7 +1935,7 @@ function renderBranchDropdown() {
   if (!sel) return;
   const branches = examSettings.branches && examSettings.branches.length > 0
     ? examSettings.branches
-    : ['มาบตาพุด','ระยอง','ปลวกแดง','บ้านฉาง','พัทยา','ชลบุรี','ศรีราชา','อื่นๆ'];
+    : ['มาบตาพุด','ระยอง','บ้านค่าย','นิคมพัฒนา','โรงงานระยอง','โรงงานปลวกแดง','ซีเค','ปลวกแดง'];
   sel.innerHTML = '<option value="">-- เลือกสาขา --</option>' +
     branches.map(b => `<option>${b}</option>`).join('');
 }
@@ -2006,11 +2021,21 @@ function selectAnswer(idx) {
 }
 
 function nextQuestion() {
-  if (currentQ < questions.length - 1) { currentQ++; renderQuestion(); }
+  if (currentQ < questions.length - 1) {
+    currentQ++;
+    renderQuestion();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.getElementById('examPage').scrollTop = 0;
+  }
 }
 
 function prevQuestion() {
-  if (currentQ > 0) { currentQ--; renderQuestion(); }
+  if (currentQ > 0) {
+    currentQ--;
+    renderQuestion();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.getElementById('examPage').scrollTop = 0;
+  }
 }
 
 function submitExam() {
