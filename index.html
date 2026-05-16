@@ -36,6 +36,13 @@
     user-select: none;
   }
 
+  /* อนุญาตให้พิมพ์ใน input/select บนมือถือ */
+  input, textarea, select {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+  }
+
   /* ป้องกัน screenshot บน iOS/Android */
   body.exam-active {
     -webkit-touch-callout: none;
@@ -853,6 +860,12 @@
         <input type="text" id="unlockCode" value="1234" placeholder="รหัส 4 หลัก">
       </div>
       <button class="btn btn-primary" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
+      <div style="margin-top:14px;">
+        <div class="section-title" style="margin-bottom:10px;">ตั้งค่าสาขาให้นักเรียนเลือก</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">ใส่ชื่อสาขาแต่ละบรรทัด</div>
+        <textarea id="branchList" rows="6" placeholder="มาบตาพุด&#10;ระยอง&#10;ปลวกแดง&#10;บ้านฉาง&#10;พัทยา&#10;ชลบุรี"></textarea>
+        <button class="btn btn-outline" style="margin-top:8px;font-size:13px;" onclick="saveBranches()">💾 บันทึกรายชื่อสาขา</button>
+      </div>
     </div>
 
     <div class="section-card">
@@ -908,15 +921,29 @@
       <h3>ข้อมูลผู้เข้าสอบ</h3>
       <div class="form-group">
         <label>ชื่อ</label>
-        <input type="text" id="studentFirstName" placeholder="กรอกชื่อ" maxlength="60">
+        <input type="text" id="studentFirstName" placeholder="กรอกชื่อ" maxlength="60"
+          autocomplete="given-name" autocorrect="off" autocapitalize="words"
+          inputmode="text" style="-webkit-user-select:text;user-select:text;">
       </div>
       <div class="form-group">
         <label>นามสกุล</label>
-        <input type="text" id="studentLastName" placeholder="กรอกนามสกุล" maxlength="60">
+        <input type="text" id="studentLastName" placeholder="กรอกนามสกุล" maxlength="60"
+          autocomplete="family-name" autocorrect="off" autocapitalize="words"
+          inputmode="text" style="-webkit-user-select:text;user-select:text;">
       </div>
       <div class="form-group">
         <label>สาขา</label>
-        <input type="text" id="studentBranch" placeholder="เช่น วิศวกรรมคอมพิวเตอร์" maxlength="60">
+        <select id="studentBranch" style="-webkit-user-select:text;user-select:text;">
+          <option value="">-- เลือกสาขา --</option>
+          <option>มาบตาพุด</option>
+          <option>ระยอง</option>
+          <option>ปลวกแดง</option>
+          <option>บ้านฉาง</option>
+          <option>พัทยา</option>
+          <option>ชลบุรี</option>
+          <option>ศรีราชา</option>
+          <option>อื่นๆ</option>
+        </select>
       </div>
       <button class="btn btn-primary" style="margin-top:8px;" onclick="startExam()">🚀 เริ่มทำข้อสอบ</button>
     </div>
@@ -1321,6 +1348,11 @@ function applySettings() {
   document.getElementById('maxWarnings').value = examSettings.maxWarnings;
   document.getElementById('unlockCode').value = examSettings.unlockCode;
   maxWarnings = examSettings.maxWarnings;
+  // โหลดรายชื่อสาขา
+  if (document.getElementById('branchList') && examSettings.branches) {
+    document.getElementById('branchList').value = (examSettings.branches || []).join('\n');
+  }
+  renderBranchDropdown();
 }
 
 // ============================================================
@@ -1329,13 +1361,14 @@ function applySettings() {
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  const isStudentMode = window.location.hash.startsWith('#exam=');
+  const isStudentMode = window.location.protocol === 'https:' || window.location.hash.startsWith('#exam=');
   document.getElementById('modeBar').style.display = (id === 'adminPage' && !isStudentMode) ? 'flex' : 'none';
   document.getElementById('mainHeader').style.display = (id === 'lockedPage' || id === 'loginPage' || isStudentMode) ? 'none' : 'flex';
   document.getElementById('headerBtn').style.display = (id === 'examPage' || id === 'resultPage' || isStudentMode) ? 'none' : 'inline-flex';
-  // ปุ่มกลับแผงผู้ดูแล — แสดงเฉพาะโหมด admin
   const backBtn = document.getElementById('backAdminBtn');
   if (backBtn) backBtn.style.display = (!isStudentMode && id === 'resultPage') ? 'block' : 'none';
+  // render dropdown ทุกครั้งที่เข้าหน้า login
+  if (id === 'loginPage') renderBranchDropdown();
 }
 
 function showAdminPanel() {
@@ -1873,6 +1906,25 @@ function updateReadyAlert() {
   }
 }
 
+function saveBranches() {
+  const raw = document.getElementById('branchList').value;
+  const branches = raw.split('\n').map(b => b.trim()).filter(b => b);
+  examSettings.branches = branches;
+  saveToStorage();
+  renderBranchDropdown();
+  alert('✅ บันทึกรายชื่อสาขาแล้ว');
+}
+
+function renderBranchDropdown() {
+  const sel = document.getElementById('studentBranch');
+  if (!sel) return;
+  const branches = examSettings.branches && examSettings.branches.length > 0
+    ? examSettings.branches
+    : ['มาบตาพุด','ระยอง','ปลวกแดง','บ้านฉาง','พัทยา','ชลบุรี','ศรีราชา','อื่นๆ'];
+  sel.innerHTML = '<option value="">-- เลือกสาขา --</option>' +
+    branches.map(b => `<option>${b}</option>`).join('');
+}
+
 function saveSettings() {
   examSettings.title = document.getElementById('examTitle').value || 'แบบทดสอบ';
   examSettings.githubURL = document.getElementById('githubURL').value.trim().replace(/\/$/, '') + '/';
@@ -1891,8 +1943,9 @@ function startExam() {
   const firstName = document.getElementById('studentFirstName').value.trim();
   const lastName = document.getElementById('studentLastName').value.trim();
   const branch = document.getElementById('studentBranch').value.trim();
-  if (!firstName || !lastName) { alert('กรุณากรอกชื่อและนามสกุล'); return; }
-  if (!branch) { alert('กรุณากรอกสาขา'); return; }
+  if (!firstName) { alert('กรุณากรอกชื่อ'); return; }
+  if (!lastName) { alert('กรุณากรอกนามสกุล'); return; }
+  if (!branch) { alert('กรุณาเลือกสาขา'); return; }
   student = { name: firstName + ' ' + lastName, firstName, lastName, branch };
   answers = {};
   currentQ = 0;
