@@ -2253,11 +2253,12 @@ function renderQuestion() {
   document.getElementById('progressFill').style.width = pct + '%';
 
   const wc = document.getElementById('warningCounter');
-  document.getElementById('warningCount').textContent = warnings;
-  wc.className = 'warning-counter wc-' + Math.min(warnings, 2);
-  if (warnings === 0) wc.innerHTML = `✓ ออกจากหน้า: <strong>${warnings}</strong>/<strong>${maxWarnings}</strong>`;
-  else if (warnings === 1) wc.innerHTML = `⚠️ ออกจากหน้า: <strong>${warnings}</strong>/<strong>${maxWarnings}</strong>`;
-  else wc.innerHTML = `🚨 ออกจากหน้า: <strong>${warnings}</strong>/<strong>${maxWarnings}</strong>`;
+  if (wc) {
+    if (warnings === 0) wc.innerHTML = `✓ ออกจากหน้า: <strong>0</strong>/<strong>${maxWarnings}</strong>`;
+    else if (warnings === 1) wc.innerHTML = `⚠️ ออกจากหน้า: <strong>1</strong>/<strong>${maxWarnings}</strong>`;
+    else wc.innerHTML = `🚨 ออกจากหน้า: <strong>${warnings}</strong>/<strong>${maxWarnings}</strong>`;
+    wc.className = 'warning-counter wc-' + Math.min(warnings, 2);
+  }
 
   const selected = answers[q.id] ?? null;
 
@@ -2496,8 +2497,14 @@ function flashProtect() {
 function handleViolation() {
   if (!examActive || examLocked) return;
   warnings++;
-  const wc = document.getElementById('warningCount');
-  if (wc) wc.textContent = warnings;
+  // อัปเดต warningCounter ทั้ง element แทนที่จะหา warningCount ลูกที่อาจถูกทับ
+  const wc = document.getElementById('warningCounter');
+  if (wc) {
+    if (warnings === 0) wc.innerHTML = `✓ ออกจากหน้า: <strong>0</strong>/<strong>${maxWarnings}</strong>`;
+    else if (warnings === 1) wc.innerHTML = `⚠️ ออกจากหน้า: <strong>1</strong>/<strong>${maxWarnings}</strong>`;
+    else wc.innerHTML = `🚨 ออกจากหน้า: <strong>${warnings}</strong>/<strong>${maxWarnings}</strong>`;
+    wc.className = 'warning-counter wc-' + Math.min(warnings, 2);
+  }
   updateMonitor();
 
   if (warnings >= maxWarnings + 1) {
