@@ -1139,8 +1139,21 @@
     <div class="result-grade" id="resultGrade"></div>
     <div class="result-summary" id="resultSummary"></div>
     <div class="review-list" id="reviewList"></div>
-    <div style="margin-top:20px;">
-      <button class="btn btn-outline" id="backAdminBtn" style="margin-top:10px;display:none;" onclick="showAdminPanel()">⚙️ กลับแผงผู้ดูแล</button>
+
+    <!-- ส่วนขอสอบใหม่ -->
+    <div style="margin-top:24px;background:#f8fafc;border:1.5px solid #d0d8e8;border-radius:14px;padding:18px;text-align:center;">
+      <div style="font-family:'Kanit',sans-serif;font-size:14px;font-weight:600;color:var(--primary);margin-bottom:6px;">🔄 ต้องการสอบใหม่?</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">กรอกรหัส 6 หลัก จากผู้ดูแล</div>
+      <input type="text" id="resultOTPInput" placeholder="รหัส 6 หลัก..." maxlength="6" inputmode="numeric"
+        style="-webkit-user-select:text;user-select:text;width:160px;padding:10px;border-radius:10px;border:1.5px solid #d0d8e8;font-size:18px;text-align:center;letter-spacing:4px;font-family:'Kanit',sans-serif;outline:none;background:white;"
+        onkeydown="if(event.key==='Enter')tryResultOTP()">
+      <div style="margin-top:10px;">
+        <button class="btn btn-primary" onclick="tryResultOTP()" style="width:auto;padding:10px 24px;font-size:14px;">🔄 เริ่มสอบใหม่</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <button class="btn btn-outline" id="backAdminBtn" style="display:none;" onclick="showAdminPanel()">⚙️ กลับแผงผู้ดูแล</button>
     </div>
   </div>
 </div>
@@ -1660,6 +1673,32 @@ function showDoneGatePage() {
         </button>
       </div>
     </div>`;
+}
+
+function tryResultOTP() {
+  const input = document.getElementById('resultOTPInput')?.value.trim();
+  let savedOTP = null;
+  try { savedOTP = localStorage.getItem('retakeOTP'); } catch(e) {}
+  if (!savedOTP || input !== savedOTP) {
+    alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว\nกรุณาขอรหัสใหม่จากผู้ดูแล');
+    if (document.getElementById('resultOTPInput')) document.getElementById('resultOTPInput').value = '';
+    return;
+  }
+  // ล้าง OTP และสถานะทั้งหมด
+  try {
+    localStorage.removeItem('retakeOTP');
+    localStorage.removeItem('examDone');
+    localStorage.removeItem('examLocked');
+    localStorage.removeItem('examTimeLeft');
+    localStorage.removeItem('examCurrentQ');
+    localStorage.removeItem('examAnswers');
+    localStorage.removeItem('examSession');
+    localStorage.removeItem('examStudent');
+    localStorage.removeItem('examWarnings');
+  } catch(e) {}
+  currentOTP = null;
+  // reload เพื่อเริ่มใหม่
+  window.location.reload();
 }
 
 function tryDoneOTP() {
