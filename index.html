@@ -750,6 +750,89 @@
 </head>
 <body>
 
+<script>
+// ตรวจจับ In-app browser และพาไปเปิดใน browser จริง
+(function() {
+  const ua = navigator.userAgent || '';
+  const isLine = /Line\//i.test(ua);
+  const isFB = /FBAN|FBAV|Facebook/i.test(ua);
+  const isIG = /Instagram/i.test(ua);
+  const isInAppBrowser = isLine || isFB || isIG || /MicroMessenger/i.test(ua);
+
+  if (!isInAppBrowser) return; // ปกติ ออกได้เลย
+
+  const currentURL = window.location.href;
+  let redirected = false;
+
+  // Android: ลอง intent:// เพื่อเปิด Chrome
+  if (/Android/i.test(ua)) {
+    try {
+      const intentURL = 'intent://' + currentURL.replace(/^https?:\/\//, '') +
+        '#Intent;scheme=https;package=com.android.chrome;end';
+      window.location.href = intentURL;
+      redirected = true;
+    } catch(e) {}
+  }
+
+  // iOS: ลอง googlechrome:// หรือ x-web-search://
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    try {
+      const chromeURL = currentURL.replace('https://', 'googlechrome://').replace('http://', 'googlechrome://');
+      window.location.href = chromeURL;
+      redirected = true;
+    } catch(e) {}
+  }
+
+  // ถ้า redirect ไม่ได้อัตโนมัติ แสดงหน้าแจ้งเตือน
+  setTimeout(() => {
+    // ซ่อนทุกอย่าง แสดงแค่หน้าแจ้งเตือน
+    document.body.innerHTML = `
+      <div style="
+        position:fixed;inset:0;
+        background:linear-gradient(160deg,#0f2348,#1a3a6b);
+        display:flex;flex-direction:column;
+        align-items:center;justify-content:center;
+        padding:32px;color:white;font-family:sans-serif;text-align:center;">
+        <div style="font-size:56px;margin-bottom:16px;">⚠️</div>
+        <div style="font-size:20px;font-weight:700;margin-bottom:12px;">กรุณาเปิดใน Browser</div>
+        <div style="font-size:14px;opacity:0.85;line-height:1.7;margin-bottom:28px;">
+          ตรวจพบว่าคุณเปิดลิงก์จากแอป Line / Facebook<br>
+          ระบบสอบต้องเปิดใน <strong>Chrome</strong> หรือ <strong>Safari</strong> เท่านั้น<br>
+          เพื่อความปลอดภัยของการสอบ
+        </div>
+        <button onclick="copyAndOpen()" style="
+          background:#e8a020;border:none;color:white;
+          padding:14px 28px;border-radius:12px;
+          font-size:16px;font-weight:700;
+          margin-bottom:12px;width:100%;max-width:300px;cursor:pointer;">
+          📋 คัดลอกลิงก์ แล้วเปิดใน Chrome
+        </button>
+        <div style="font-size:12px;opacity:0.6;margin-top:8px;">
+          วิธีเปิด: คัดลอกลิงก์ → เปิด Chrome → วางลิงก์ในช่อง URL
+        </div>
+        <div id="copyMsg" style="margin-top:12px;font-size:13px;color:#90ee90;display:none;">
+          ✅ คัดลอกลิงก์แล้ว! กรุณาเปิด Chrome แล้ววางลิงก์
+        </div>
+      </div>`;
+
+    window.copyAndOpen = function() {
+      const url = currentURL;
+      navigator.clipboard.writeText(url).then(() => {
+        document.getElementById('copyMsg').style.display = 'block';
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        document.getElementById('copyMsg').style.display = 'block';
+      });
+    };
+  }, 1500);
+})();
+</script>
+
 <div class="ss-protect" id="ssProtect"></div>
 
 <!-- ===== HEADER ===== -->
@@ -2149,7 +2232,7 @@ function renderQuestion() {
   const nextBtn = document.getElementById('nextBtn');
   const submitBtn = document.getElementById('submitBtn');
   prevBtn.style.visibility = currentQ > 0 ? 'visible' : 'hidden';
-  const isLast = currentQ === questions.length - 1;
+  const isLast = currentQ === examQ.length - 1;
   nextBtn.classList.toggle('hidden', isLast);
   submitBtn.classList.toggle('hidden', !isLast);
 }
