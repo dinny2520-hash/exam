@@ -1259,7 +1259,7 @@ let examSettings = {
   title: 'แบบทดสอบ',
   maxScore: 100,
   maxWarnings: 2,
-  unlockCode: '1234',
+  unlockCode: '2520',
   timeLimit: 0
 };
 let student = {};
@@ -1272,6 +1272,14 @@ const choiceLabels = ['ก', 'ข', 'ค', 'ง'];
 // ============================================================
 function init() {
   const hash = window.location.hash;
+
+  // โหมดผู้ดูแลจาก GitHub: #admin
+  if (hash === '#admin' || hash.startsWith('#admin')) {
+    loadFromStorage();
+    showAdminFromURL();
+    setupAntiCheat();
+    return;
+  }
 
   // โหมดนักเรียน: เปิดจาก GitHub (https://) → โหลด questions.json อัตโนมัติ
   if (window.location.protocol === 'https:' && !hash.startsWith('#exam=') && !hash.startsWith('#admin')) {
@@ -1375,9 +1383,55 @@ function downloadQuestionsJSON() {
 // Admin login gate — ไม่บังเมื่อเปิดไฟล์ปกติ
 let isAdminLoggedIn = true; // เปิดไฟล์ตรงถือว่าเป็น admin
 function checkAdminLogin() {
-  // ไม่ต้อง prompt เมื่อเปิดไฟล์ตรง
   isAdminLoggedIn = true;
   showPage('adminPage');
+}
+
+// เปิดหน้า Admin จาก URL #admin — ต้องใส่รหัส
+function showAdminFromURL() {
+  // แสดง overlay ถามรหัส
+  const overlay = document.createElement('div');
+  overlay.id = 'adminURLOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:linear-gradient(160deg,#0f2348,#1a3a6b,#2756a8);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:28px 24px;width:100%;max-width:360px;box-shadow:0 8px 40px rgba(0,0,0,0.3);">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:40px;margin-bottom:8px;">🔐</div>
+        <div style="font-family:'Kanit',sans-serif;font-size:17px;font-weight:600;color:#1a3a6b;">เข้าสู่ระบบผู้ดูแล</div>
+        <div style="font-size:13px;color:#5a6a85;margin-top:4px;">กรุณาใส่รหัสผู้ดูแล</div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <input type="password" id="adminURLCode" placeholder="รหัสผู้ดูแล..."
+          style="width:100%;padding:12px 16px;border:1.5px solid #d0d8e8;border-radius:10px;font-size:16px;text-align:center;letter-spacing:4px;outline:none;"
+          onkeydown="if(event.key==='Enter')checkAdminURLCode()">
+      </div>
+      <div id="adminURLErr" style="color:#c0392b;font-size:13px;text-align:center;margin-bottom:10px;min-height:18px;"></div>
+      <button onclick="checkAdminURLCode()" style="width:100%;padding:12px;background:#1a3a6b;color:white;border:none;border-radius:10px;font-family:'Kanit',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">
+        🔓 เข้าสู่ระบบ
+      </button>
+      <button onclick="window.location.hash='';window.location.reload();" style="width:100%;padding:10px;background:transparent;color:#5a6a85;border:1px solid #d0d8e8;border-radius:10px;font-family:'Kanit',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">
+        ← กลับหน้าสอบ
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('adminURLCode')?.focus(), 300);
+}
+
+function checkAdminURLCode() {
+  const code = document.getElementById('adminURLCode')?.value.trim();
+  const ADMIN_CODE = '2520';
+  if (code === ADMIN_CODE) {
+    document.getElementById('adminURLOverlay')?.remove();
+    isAdminLoggedIn = true;
+    loadFromStorage();
+    renderQuestionList();
+    updateReadyAlert();
+    showPage('adminPage');
+  } else {
+    document.getElementById('adminURLErr').textContent = '❌ รหัสไม่ถูกต้อง';
+    document.getElementById('adminURLCode').value = '';
+    document.getElementById('adminURLCode').focus();
+  }
 }
 
 function showAdminLoginPrompt() {
@@ -2442,7 +2496,8 @@ function flashProtect() {
 function handleViolation() {
   if (!examActive || examLocked) return;
   warnings++;
-  document.getElementById('warningCount').textContent = warnings;
+  const wc = document.getElementById('warningCount');
+  if (wc) wc.textContent = warnings;
   updateMonitor();
 
   if (warnings >= maxWarnings + 1) {
@@ -2454,12 +2509,16 @@ function handleViolation() {
 
 function showWarningPopup(count, max) {
   const remaining = max - count;
-  document.getElementById('warnTitle').textContent = `⚠️ คำเตือนครั้งที่ ${count}!`;
-  document.getElementById('warnMsg').textContent =
+  const warnTitle = document.getElementById('warnTitle');
+  const warnMsg = document.getElementById('warnMsg');
+  const popup = document.getElementById('warningPopup');
+  if (!warnTitle || !warnMsg || !popup) return;
+  warnTitle.textContent = `⚠️ คำเตือนครั้งที่ ${count}!`;
+  warnMsg.textContent =
     remaining > 0
       ? `คุณออกจากหน้าจอสอบ\nเหลือโอกาสอีก ${remaining} ครั้ง หากออกอีกครั้งการสอบจะถูกล็อค`
       : `คุณออกจากหน้าจอสอบครบ ${max} ครั้งแล้ว\nนี่คือครั้งสุดท้าย หากออกอีกการสอบจะถูกล็อคทันที!`;
-  document.getElementById('warningPopup').style.display = 'flex';
+  popup.style.display = 'flex';
 }
 
 function dismissWarning() {
