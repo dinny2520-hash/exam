@@ -1675,66 +1675,6 @@ function showDoneGatePage() {
     </div>`;
 }
 
-function tryResultOTP() {
-  const input = document.getElementById('resultOTPInput')?.value.trim();
-  let savedOTP = null;
-  try { savedOTP = localStorage.getItem('retakeOTP'); } catch(e) {}
-  if (!savedOTP || input !== savedOTP) {
-    alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว\nกรุณาขอรหัสใหม่จากผู้ดูแล');
-    if (document.getElementById('resultOTPInput')) document.getElementById('resultOTPInput').value = '';
-    return;
-  }
-  // ล้าง OTP และสถานะทั้งหมด
-  try {
-    localStorage.removeItem('retakeOTP');
-    localStorage.removeItem('examDone');
-    localStorage.removeItem('examLocked');
-    localStorage.removeItem('examTimeLeft');
-    localStorage.removeItem('examCurrentQ');
-    localStorage.removeItem('examAnswers');
-    localStorage.removeItem('examSession');
-    localStorage.removeItem('examStudent');
-    localStorage.removeItem('examWarnings');
-  } catch(e) {}
-  currentOTP = null;
-  // reload เพื่อเริ่มใหม่
-  window.location.reload();
-}
-
-function tryDoneOTP() {
-  const input = document.getElementById('doneOTPInput')?.value.trim();
-  let savedOTP = null;
-  try { savedOTP = localStorage.getItem('retakeOTP'); } catch(e) {}
-  if (!savedOTP || input !== savedOTP) {
-    alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว\nกรุณาขอรหัสใหม่จากผู้ดูแล');
-    if (document.getElementById('doneOTPInput')) document.getElementById('doneOTPInput').value = '';
-    return;
-  }
-  // ล้าง OTP และสถานะทั้งหมด
-  try {
-    localStorage.removeItem('retakeOTP');
-    localStorage.removeItem('examDone');
-    localStorage.removeItem('examLocked');
-    localStorage.removeItem('examTimeLeft');
-    localStorage.removeItem('examCurrentQ');
-    localStorage.removeItem('examAnswers');
-    localStorage.removeItem('examSession');
-    localStorage.removeItem('examStudent');
-    localStorage.removeItem('examWarnings');
-  } catch(e) {}
-  currentOTP = null;
-  examLocked = false;
-  examActive = false;
-  examSession = [];
-  answers = {};
-  currentQ = 0;
-  warnings = 0;
-  student = {};
-  stopTimer();
-  // reload หน้าเพื่อเริ่มใหม่สะอาด
-  window.location.reload();
-}
-
 let currentOTP = null;
 
 function generateRetakeOTP() {
@@ -1744,44 +1684,57 @@ function generateRetakeOTP() {
     document.getElementById('retakeAdminCode').value = '';
     return;
   }
-  // สร้าง OTP 6 หลัก
-  currentOTP = Math.floor(100000 + Math.random() * 900000).toString();
-  // เก็บใน localStorage
-  try { localStorage.setItem('retakeOTP', currentOTP); } catch(e) {}
-  document.getElementById('otpCode').textContent = currentOTP;
-  document.getElementById('otpDisplay').style.display = 'block';
   document.getElementById('retakeAdminCode').value = '';
-}
+  document.getElementById('otpDisplay').style.display = 'block';
+  document.getElementById('otpCode').textContent = '⏳ กำลังสร้าง...';
 
-function copyOTP() {
-  if (!currentOTP) return;
-  navigator.clipboard.writeText(currentOTP).then(() => {
-    alert('✅ คัดลอกรหัส ' + currentOTP + ' แล้ว');
-  }).catch(() => {
-    alert('รหัสสอบใหม่: ' + currentOTP);
+  fetch(SHEETS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'createOTP' })
+  }).then(async res => {
+    // no-cors ทำให้อ่าน response ไม่ได้ ต้องใช้ cors proxy หรือเปลี่ยนวิธี
+    // ใช้ fetch แบบ cors แทน
+    throw new Error('use_cors');
+  }).catch(async () => {
+    // ลอง fetch แบบ cors
+    try {
+      const res = await fetch(SHEETS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'createOTP' })
+      });
+      const data = await res.json();
+      if (data.status === 'ok' && data.otp) {
+        document.getElementById('otpCode').textContent = data.otp;
+        currentOTP = data.otp;
+      } else {
+        document.getElementById('otpCode').textContent = '❌ เกิดข้อผิดพลาด';
+      }
+    } catch(e2) {
+      document.getElementById('otpCode').textContent = '❌ ไม่สามารถสร้างรหัสได้';
+    }
   });
 }
 
-function tryOTPRetake() {
-  const input = document.getElementById('otpInput').value.trim();
-  let savedOTP = null;
-  try { savedOTP = localStorage.getItem('retakeOTP'); } catch(e) {}
-
-  if (!savedOTP || input !== savedOTP) {
-    alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว');
-    document.getElementById('otpInput').value = '';
-    return;
+async function checkOTPFromSheets(inputOTP) {
+  try {
+    const res = await fetch(SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'checkOTP', otp: inputOTP })
+    });
+    const data = await res.json();
+    return data.status === 'ok';
+  } catch(e) {
+    return false;
   }
+}
 
-  // ล้าง OTP ทันที (ใช้ได้ครั้งเดียว)
+function clearExamState() {
   try {
-    localStorage.removeItem('retakeOTP');
     localStorage.removeItem('examDone');
-  } catch(e) {}
-  currentOTP = null;
-
-  // ล้างสถานะสอบทั้งหมด
-  try {
     localStorage.removeItem('examLocked');
     localStorage.removeItem('examTimeLeft');
     localStorage.removeItem('examCurrentQ');
@@ -1789,8 +1742,8 @@ function tryOTPRetake() {
     localStorage.removeItem('examSession');
     localStorage.removeItem('examStudent');
     localStorage.removeItem('examWarnings');
+    localStorage.removeItem('retakeOTP');
   } catch(e) {}
-
   examLocked = false;
   examActive = false;
   examSession = [];
@@ -1799,14 +1752,47 @@ function tryOTPRetake() {
   warnings = 0;
   student = {};
   stopTimer();
-
-  // พาไปหน้า login เพื่อเริ่มสอบใหม่
-  showPage('loginPage');
-  document.getElementById('loginExamTitle').textContent = examSettings.title;
-  document.getElementById('otpInput').value = '';
 }
 
-function allowRetake() {} // kept for compatibility
+async function tryResultOTP() {
+  const input = document.getElementById('resultOTPInput')?.value.trim();
+  if (!input || input.length !== 6) { alert('กรุณากรอกรหัส 6 หลัก'); return; }
+  document.getElementById('resultOTPInput').value = '';
+  const ok = await checkOTPFromSheets(input);
+  if (ok) {
+    clearExamState();
+    window.location.reload();
+  } else {
+    alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว\nกรุณาขอรหัสใหม่จากผู้ดูแล');
+  }
+}
+
+async function tryDoneOTP() {
+  const input = document.getElementById('doneOTPInput')?.value.trim();
+  if (!input || input.length !== 6) { alert('กรุณากรอกรหัส 6 หลัก'); return; }
+  if (document.getElementById('doneOTPInput')) document.getElementById('doneOTPInput').value = '';
+  const ok = await checkOTPFromSheets(input);
+  if (ok) {
+    clearExamState();
+    window.location.reload();
+  } else {
+    alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว\nกรุณาขอรหัสใหม่จากผู้ดูแล');
+  }
+}
+
+async function tryOTPRetake() {
+  const input = document.getElementById('otpInput')?.value.trim();
+  if (!input || input.length !== 6) { alert('กรุณากรอกรหัส 6 หลัก'); return; }
+  if (document.getElementById('otpInput')) document.getElementById('otpInput').value = '';
+  const ok = await checkOTPFromSheets(input);
+  if (ok) {
+    clearExamState();
+    showPage('loginPage');
+    document.getElementById('loginExamTitle').textContent = examSettings.title;
+  } else {
+    alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว\nกรุณาขอรหัสใหม่จากผู้ดูแล');
+  }
+}
 
 function restartExam() {
   // เคลียร์ฟอร์ม
