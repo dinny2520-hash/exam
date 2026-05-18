@@ -1035,9 +1035,25 @@
       <div class="alert alert-warn">นักเรียนออกจากหน้าจอสอบเกินกำหนด กรุณาปลดล็อค</div>
       <div class="form-group">
         <label>รหัสปลดล็อค</label>
-        <input type="text" id="adminUnlockInput" placeholder="ใส่รหัสปลดล็อค" maxlength="4">
+        <input type="text" id="adminUnlockInput" placeholder="ใส่รหัสปลดล็อค" maxlength="20">
       </div>
       <button class="btn btn-success" onclick="adminUnlock()">🔓 ปลดล็อคการสอบ</button>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title">🔄 อนุญาตให้สอบใหม่รายคน</div>
+      <div class="alert alert-info" style="margin-bottom:12px;">สร้างรหัส 6 หลัก → บอกนักเรียนคนที่ต้องการ → ใช้ได้ครั้งเดียวเท่านั้น</div>
+      <div class="form-group">
+        <label>รหัสผู้ดูแล (เพื่อยืนยัน)</label>
+        <input type="password" id="retakeAdminCode" placeholder="ใส่รหัสผู้ดูแล..." maxlength="20">
+      </div>
+      <button class="btn btn-primary" onclick="generateRetakeOTP()">🎲 สร้างรหัสสอบใหม่</button>
+      <div id="otpDisplay" style="display:none;margin-top:14px;background:#f0f4f8;border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">รหัสสอบใหม่ (ใช้ได้ครั้งเดียว)</div>
+        <div id="otpCode" style="font-family:monospace;font-size:36px;font-weight:700;color:var(--primary);letter-spacing:8px;"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">บอกรหัสนี้ให้นักเรียนกรอกในหน้าล็อค</div>
+        <button class="btn btn-outline btn-sm" onclick="copyOTP()" style="margin-top:10px;">📋 คัดลอกรหัส</button>
+      </div>
     </div>
   </div>
 
@@ -1124,7 +1140,6 @@
     <div class="result-summary" id="resultSummary"></div>
     <div class="review-list" id="reviewList"></div>
     <div style="margin-top:20px;">
-      <button class="btn btn-primary" onclick="restartExam()">🔄 ทำใหม่อีกครั้ง</button>
       <button class="btn btn-outline" id="backAdminBtn" style="margin-top:10px;display:none;" onclick="showAdminPanel()">⚙️ กลับแผงผู้ดูแล</button>
     </div>
   </div>
@@ -1138,10 +1153,22 @@
     <p>คุณออกจากหน้าจอสอบเกินจำนวนครั้งที่กำหนด<br><strong>กรุณาแจ้งเจ้าหน้าที่เพื่อปลดล็อค</strong></p>
     <p style="font-size:13px;opacity:0.7;margin-bottom:8px;">ห้ามปิดหน้าต่างนี้จนกว่าเจ้าหน้าที่จะมาปลดล็อค</p>
     <div style="width:48px;height:3px;background:rgba(255,255,255,0.3);border-radius:2px;margin:0 auto 20px;"></div>
-    <p style="font-size:12px;opacity:0.5;margin-bottom:12px;">— สำหรับเจ้าหน้าที่เท่านั้น —</p>
+
+    <!-- ปลดล็อคปกติ -->
+    <p style="font-size:12px;opacity:0.5;margin-bottom:8px;">— ปลดล็อคโดยเจ้าหน้าที่ —</p>
     <input type="password" class="unlock-input" id="unlockInput" placeholder="รหัสเจ้าหน้าที่..." maxlength="20" inputmode="text" onkeydown="if(event.key==='Enter')tryUnlock()">
-    <div style="margin-top:16px;">
+    <div style="margin-top:12px;">
       <button class="btn btn-accent" onclick="tryUnlock()" style="width:auto;padding:11px 32px;">🔓 ปลดล็อค</button>
+    </div>
+
+    <!-- สอบใหม่ด้วย OTP -->
+    <div style="margin-top:24px;width:100%;max-width:320px;">
+      <div style="height:1px;background:rgba(255,255,255,0.2);margin-bottom:20px;"></div>
+      <p style="font-size:12px;opacity:0.5;margin-bottom:8px;">— หรือสอบใหม่ด้วยรหัสพิเศษ —</p>
+      <input type="text" class="unlock-input" id="otpInput" placeholder="รหัส 6 หลัก..." maxlength="6" inputmode="numeric" onkeydown="if(event.key==='Enter')tryOTPRetake()" style="letter-spacing:6px;font-size:20px;">
+      <div style="margin-top:12px;">
+        <button class="btn btn-outline" onclick="tryOTPRetake()" style="width:auto;padding:11px 32px;background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.4);">🔄 เริ่มสอบใหม่</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1604,6 +1631,76 @@ function switchMode(mode) {
     showPage('adminPage');
   }
 }
+
+let currentOTP = null;
+
+function generateRetakeOTP() {
+  const code = document.getElementById('retakeAdminCode').value.trim();
+  if (code !== examSettings.unlockCode) {
+    alert('❌ รหัสผู้ดูแลไม่ถูกต้อง');
+    document.getElementById('retakeAdminCode').value = '';
+    return;
+  }
+  // สร้าง OTP 6 หลัก
+  currentOTP = Math.floor(100000 + Math.random() * 900000).toString();
+  // เก็บใน localStorage
+  try { localStorage.setItem('retakeOTP', currentOTP); } catch(e) {}
+  document.getElementById('otpCode').textContent = currentOTP;
+  document.getElementById('otpDisplay').style.display = 'block';
+  document.getElementById('retakeAdminCode').value = '';
+}
+
+function copyOTP() {
+  if (!currentOTP) return;
+  navigator.clipboard.writeText(currentOTP).then(() => {
+    alert('✅ คัดลอกรหัส ' + currentOTP + ' แล้ว');
+  }).catch(() => {
+    alert('รหัสสอบใหม่: ' + currentOTP);
+  });
+}
+
+function tryOTPRetake() {
+  const input = document.getElementById('otpInput').value.trim();
+  let savedOTP = null;
+  try { savedOTP = localStorage.getItem('retakeOTP'); } catch(e) {}
+
+  if (!savedOTP || input !== savedOTP) {
+    alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว');
+    document.getElementById('otpInput').value = '';
+    return;
+  }
+
+  // ล้าง OTP ทันที (ใช้ได้ครั้งเดียว)
+  try { localStorage.removeItem('retakeOTP'); } catch(e) {}
+  currentOTP = null;
+
+  // ล้างสถานะสอบทั้งหมด
+  try {
+    localStorage.removeItem('examLocked');
+    localStorage.removeItem('examTimeLeft');
+    localStorage.removeItem('examCurrentQ');
+    localStorage.removeItem('examAnswers');
+    localStorage.removeItem('examSession');
+    localStorage.removeItem('examStudent');
+    localStorage.removeItem('examWarnings');
+  } catch(e) {}
+
+  examLocked = false;
+  examActive = false;
+  examSession = [];
+  answers = {};
+  currentQ = 0;
+  warnings = 0;
+  student = {};
+  stopTimer();
+
+  // พาไปหน้า login เพื่อเริ่มสอบใหม่
+  showPage('loginPage');
+  document.getElementById('loginExamTitle').textContent = examSettings.title;
+  document.getElementById('otpInput').value = '';
+}
+
+function allowRetake() {} // kept for compatibility
 
 function restartExam() {
   // เคลียร์ฟอร์ม
