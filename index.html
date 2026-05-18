@@ -1677,6 +1677,12 @@ function showDoneGatePage() {
 
 let currentOTP = null;
 
+// เรียก Sheets ด้วย fetch GET (Apps Script รองรับ CORS สำหรับ GET)
+function callSheets(params) {
+  const url = SHEETS_URL + '?' + new URLSearchParams(params).toString();
+  return fetch(url).then(r => r.json());
+}
+
 function generateRetakeOTP() {
   const code = document.getElementById('retakeAdminCode').value.trim();
   if (code !== examSettings.unlockCode) {
@@ -1687,42 +1693,24 @@ function generateRetakeOTP() {
   document.getElementById('retakeAdminCode').value = '';
   document.getElementById('otpDisplay').style.display = 'block';
   document.getElementById('otpCode').textContent = '⏳ กำลังสร้าง...';
-
-  fetch(SHEETS_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'createOTP' })
-  }).then(async res => {
-    // no-cors ทำให้อ่าน response ไม่ได้ ต้องใช้ cors proxy หรือเปลี่ยนวิธี
-    // ใช้ fetch แบบ cors แทน
-    throw new Error('use_cors');
-  }).catch(async () => {
-    // ลอง fetch แบบ cors
-    try {
-      const res = await fetch(SHEETS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'createOTP' })
-      });
-      const data = await res.json();
+  callSheets({ action: 'createOTP' })
+    .then(data => {
       if (data.status === 'ok' && data.otp) {
         document.getElementById('otpCode').textContent = data.otp;
         currentOTP = data.otp;
       } else {
-        document.getElementById('otpCode').textContent = '❌ เกิดข้อผิดพลาด';
+        document.getElementById('otpCode').textContent = '❌ เกิดข้อผิดพลาด: ' + (data.msg || '');
       }
-    } catch(e2) {
+    })
+    .catch(e => {
       document.getElementById('otpCode').textContent = '❌ ไม่สามารถสร้างรหัสได้';
-    }
-  });
+      console.log('OTP error:', e);
+    });
 }
 
 async function checkOTPFromSheets(inputOTP) {
   try {
-    const url = SHEETS_URL + '?action=checkOTP&otp=' + encodeURIComponent(inputOTP);
-    const res = await fetch(url);
-    const data = await res.json();
+    const data = await callSheets({ action: 'checkOTP', otp: inputOTP });
     return data.status === 'ok';
   } catch(e) {
     console.log('checkOTP error:', e);
@@ -1730,31 +1718,29 @@ async function checkOTPFromSheets(inputOTP) {
   }
 }
 
-function generateRetakeOTP() {
-  const code = document.getElementById('retakeAdminCode').value.trim();
-  if (code !== examSettings.unlockCode) {
-    alert('❌ รหัสผู้ดูแลไม่ถูกต้อง');
-    document.getElementById('retakeAdminCode').value = '';
-    return;
-  }
-  document.getElementById('retakeAdminCode').value = '';
-  document.getElementById('otpDisplay').style.display = 'block';
-  document.getElementById('otpCode').textContent = '⏳ กำลังสร้าง...';
-
-  const url = SHEETS_URL + '?action=createOTP';
-  fetch(url)
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === 'ok' && data.otp) {
-        document.getElementById('otpCode').textContent = data.otp;
-        currentOTP = data.otp;
-      } else {
-        document.getElementById('otpCode').textContent = '❌ เกิดข้อผิดพลาด';
-      }
-    })
-    .catch(() => {
-      document.getElementById('otpCode').textContent = '❌ ไม่สามารถสร้างรหัสได้';
+async function sendResultToSheets(r, passed, timeUsed) {
+  try {
+    const now = new Date();
+    const dateStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    await callSheets({
+      action: 'saveResult',
+      date: dateStr,
+      firstName: student.firstName || student.name || '',
+      lastName: student.lastName || '',
+      branch: student.branch || '',
+      examTitle: examSettings.title,
+      score: r.score,
+      maxScore: examSettings.maxScore,
+      pct: (r.pct * 100).toFixed(1) + '%',
+      correct: r.correct,
+      wrong: r.total - r.correct,
+      timeUsed: timeUsed,
+      warnings: warnings,
+      passed: passed ? 'ผ่าน' : 'ไม่ผ่าน'
     });
+  } catch(e) {
+    console.log('Sheets save error:', e);
+  }
 }
 
 async function tryResultOTP() {
@@ -2597,7 +2583,7 @@ function calculateResult() {
   showResult(examResults);
 }
 
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbz9_LG2EE7w0YNUXWJu4TGKWrUwzuUPK1CVswUmMzGKcpgojx17IaaGvyP9E-FKtEk/exec';
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyzDomRB8ueDvuOvVg6w25lfjHUXbGDhMDgYuW3hvvceYsZxftgMd1Yv11l7CA2Y9S7/exec';
 const PASS_PERCENT = 0.70; // เกณฑ์ผ่าน 70%
 
 function showResult(r) {
@@ -2644,31 +2630,6 @@ function showResult(r) {
   sendResultToSheets(r, passed, timeUsed);
 }
 
-async function sendResultToSheets(r, passed, timeUsed) {
-  try {
-    const now = new Date();
-    const dateStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-    const params = new URLSearchParams({
-      action: 'saveResult',
-      date: dateStr,
-      firstName: student.firstName || student.name,
-      lastName: student.lastName || '',
-      branch: student.branch || '',
-      examTitle: examSettings.title,
-      score: r.score,
-      maxScore: examSettings.maxScore,
-      pct: (r.pct * 100).toFixed(1) + '%',
-      correct: r.correct,
-      wrong: r.total - r.correct,
-      timeUsed: timeUsed,
-      warnings: warnings,
-      passed: passed ? 'ผ่าน' : 'ไม่ผ่าน'
-    });
-    await fetch(SHEETS_URL + '?' + params.toString());
-  } catch(e) {
-    console.log('Sheets error:', e);
-  }
-}
 
 
 // ============================================================
