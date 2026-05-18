@@ -1357,11 +1357,11 @@ async function loadFromGitHub() {
 
     // ตรวจสอบว่าถูกล็อคอยู่หรือเปล่า
     try {
-      const isLocked = sessionStorage.getItem('examLocked');
+      const isLocked = localStorage.getItem('examLocked');
       if (isLocked === 'true') {
         examLocked = true;
         examActive = false;
-        examTimeLeft = parseInt(sessionStorage.getItem('examTimeLeft') || '0');
+        examTimeLeft = parseInt(localStorage.getItem('examTimeLeft') || '0');
         showPage('lockedPage');
         return;
       }
@@ -2556,8 +2556,8 @@ function lockExam() {
   stopTimer();
   // บันทึกสถานะล็อคใน sessionStorage ป้องกันเปิดลิงก์ใหม่แล้วเข้าสอบได้
   try {
-    sessionStorage.setItem('examLocked', 'true');
-    sessionStorage.setItem('examTimeLeft', examTimeLeft);
+    localStorage.setItem('examLocked', 'true');
+    localStorage.setItem('examTimeLeft', examTimeLeft);
   } catch(e) {}
   document.getElementById('warningPopup').style.display = 'none';
   document.body.classList.remove('exam-active');
@@ -2589,7 +2589,7 @@ function unlockExam() {
   examLocked = false;
   examActive = true;
   warnings = maxWarnings;
-  try { sessionStorage.removeItem('examLocked'); } catch(e) {}
+  try { localStorage.removeItem('examLocked'); } catch(e) {}
   document.body.classList.add('exam-active');
   const ls = document.getElementById('lockedSection');
   if (ls) ls.style.display = 'none';
