@@ -2415,17 +2415,7 @@ function showResult(r) {
     ${examSettings.timeLimit > 0 ? `<div class="result-row"><span class="label">เวลาที่ใช้</span><span class="value">${formatTimeUsed()}</span></div>` : ''}
   `;
 
-  document.getElementById('reviewList').innerHTML = '<div style="font-family:\'Kanit\',sans-serif;font-size:15px;font-weight:600;margin-bottom:12px;color:var(--primary);">รายละเอียดแต่ละข้อ</div>' +
-    r.detail.map((d,i) => `
-      <div class="review-item ${d.isCorrect ? 'correct-item' : 'wrong-item'}">
-        <div class="r-q">ข้อ ${i+1} ${d.isCorrect ? '✅' : '❌'}</div>
-        <div class="r-text">${d.q.text}</div>
-        <div class="r-ans">
-          ${d.sel ? `<span class="${d.isCorrect ? 'r-correct' : 'r-wrong'}">คำตอบของคุณ: ${d.sel}. ${d.q.choices[d.selIdx] || ''}</span>` : '<span style="color:var(--text-muted)">ไม่ได้ตอบ</span>'}
-          ${!d.isCorrect ? `<span class="r-correct">เฉลย: ${d.q.answer}. ${d.q.choices[choiceLabels.indexOf(d.q.answer)] || ''}</span>` : ''}
-        </div>
-      </div>
-    `).join('');
+  document.getElementById('reviewList').innerHTML = '';
 }
 
 
