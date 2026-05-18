@@ -2375,10 +2375,15 @@ function calculateResult() {
   showResult(examResults);
 }
 
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbz9_LG2EE7w0YNUXWJu4TGKWrUwzuUPK1CVswUmMzGKcpgojx17IaaGvyP9E-FKtEk/exec';
+const PASS_PERCENT = 0.70; // เกณฑ์ผ่าน 70%
+
 function showResult(r) {
   showPage('resultPage');
   document.getElementById('scoreText').textContent = r.score;
   document.getElementById('scoreSub').textContent = `/ ${examSettings.maxScore}`;
+
+  const passed = r.pct >= PASS_PERCENT;
 
   // Animate circle
   setTimeout(() => {
@@ -2386,22 +2391,16 @@ function showResult(r) {
     const offset = circumference - r.pct * circumference;
     const circle = document.getElementById('scoreCircle');
     circle.style.strokeDashoffset = offset;
-    // Color by score
-    if (r.pct >= 0.8) circle.style.stroke = '#1a7a4a';
-    else if (r.pct >= 0.6) circle.style.stroke = '#e8a020';
-    else circle.style.stroke = '#c0392b';
+    circle.style.stroke = passed ? '#1a7a4a' : '#c0392b';
   }, 200);
 
-  // Grade
-  let grade = '', gradeColor = '';
-  if (r.pct >= 0.9) { grade = 'ยอดเยี่ยม! 🏆'; gradeColor = '#1a7a4a'; }
-  else if (r.pct >= 0.8) { grade = 'ดีมาก! 🌟'; gradeColor = '#2756a8'; }
-  else if (r.pct >= 0.7) { grade = 'ดี 👍'; gradeColor = '#2756a8'; }
-  else if (r.pct >= 0.6) { grade = 'พอใช้ 📖'; gradeColor = '#e8a020'; }
-  else { grade = 'ต้องพัฒนา 📚'; gradeColor = '#c0392b'; }
-
+  // ผ่าน/ไม่ผ่าน
+  const grade = passed ? '✅ ผ่าน' : '❌ ไม่ผ่าน';
+  const gradeColor = passed ? '#1a7a4a' : '#c0392b';
   document.getElementById('resultGrade').textContent = grade;
   document.getElementById('resultGrade').style.color = gradeColor;
+
+  const timeUsed = formatTimeUsed();
 
   document.getElementById('resultSummary').innerHTML = `
     <div class="result-row"><span class="label">ชื่อ-นามสกุล</span><span class="value">${student.name}</span></div>
@@ -2411,11 +2410,47 @@ function showResult(r) {
     <div class="result-row"><span class="label">ตอบผิด</span><span class="value wrong">${r.total - r.correct} ข้อ</span></div>
     <div class="result-row"><span class="label">คะแนนที่ได้</span><span class="value" style="font-size:18px;color:var(--primary)">${r.score} / ${examSettings.maxScore}</span></div>
     <div class="result-row"><span class="label">คิดเป็น</span><span class="value">${(r.pct*100).toFixed(1)}%</span></div>
+    <div class="result-row"><span class="label">เกณฑ์ผ่าน</span><span class="value">70% (${Math.round(PASS_PERCENT * examSettings.maxScore)} คะแนน)</span></div>
+    <div class="result-row"><span class="label">ผลการสอบ</span><span class="value" style="font-weight:700;color:${gradeColor};font-size:16px;">${grade}</span></div>
     <div class="result-row"><span class="label">ออกจากหน้า</span><span class="value">${warnings} ครั้ง</span></div>
-    ${examSettings.timeLimit > 0 ? `<div class="result-row"><span class="label">เวลาที่ใช้</span><span class="value">${formatTimeUsed()}</span></div>` : ''}
+    ${examSettings.timeLimit > 0 ? `<div class="result-row"><span class="label">เวลาที่ใช้</span><span class="value">${timeUsed}</span></div>` : ''}
   `;
 
   document.getElementById('reviewList').innerHTML = '';
+
+  // ส่งผลสอบไป Google Sheets
+  sendResultToSheets(r, passed, timeUsed);
+}
+
+async function sendResultToSheets(r, passed, timeUsed) {
+  try {
+    const now = new Date();
+    const dateStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    const data = {
+      date: dateStr,
+      firstName: student.firstName || student.name,
+      lastName: student.lastName || '',
+      branch: student.branch || '',
+      score: r.score,
+      maxScore: examSettings.maxScore,
+      pct: (r.pct * 100).toFixed(1) + '%',
+      correct: r.correct,
+      wrong: r.total - r.correct,
+      timeUsed: timeUsed,
+      warnings: warnings,
+      passed: passed ? 'ผ่าน' : 'ไม่ผ่าน',
+      examTitle: examSettings.title
+    };
+    await fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch(e) {
+    // ไม่แสดง error ให้นักเรียนเห็น
+    console.log('Sheets error:', e);
+  }
 }
 
 
