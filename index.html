@@ -1720,38 +1720,41 @@ function generateRetakeOTP() {
 
 async function checkOTPFromSheets(inputOTP) {
   try {
-    const res = await fetch(SHEETS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'checkOTP', otp: inputOTP })
-    });
+    const url = SHEETS_URL + '?action=checkOTP&otp=' + encodeURIComponent(inputOTP);
+    const res = await fetch(url);
     const data = await res.json();
     return data.status === 'ok';
   } catch(e) {
+    console.log('checkOTP error:', e);
     return false;
   }
 }
 
-function clearExamState() {
-  try {
-    localStorage.removeItem('examDone');
-    localStorage.removeItem('examLocked');
-    localStorage.removeItem('examTimeLeft');
-    localStorage.removeItem('examCurrentQ');
-    localStorage.removeItem('examAnswers');
-    localStorage.removeItem('examSession');
-    localStorage.removeItem('examStudent');
-    localStorage.removeItem('examWarnings');
-    localStorage.removeItem('retakeOTP');
-  } catch(e) {}
-  examLocked = false;
-  examActive = false;
-  examSession = [];
-  answers = {};
-  currentQ = 0;
-  warnings = 0;
-  student = {};
-  stopTimer();
+function generateRetakeOTP() {
+  const code = document.getElementById('retakeAdminCode').value.trim();
+  if (code !== examSettings.unlockCode) {
+    alert('❌ รหัสผู้ดูแลไม่ถูกต้อง');
+    document.getElementById('retakeAdminCode').value = '';
+    return;
+  }
+  document.getElementById('retakeAdminCode').value = '';
+  document.getElementById('otpDisplay').style.display = 'block';
+  document.getElementById('otpCode').textContent = '⏳ กำลังสร้าง...';
+
+  const url = SHEETS_URL + '?action=createOTP';
+  fetch(url)
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'ok' && data.otp) {
+        document.getElementById('otpCode').textContent = data.otp;
+        currentOTP = data.otp;
+      } else {
+        document.getElementById('otpCode').textContent = '❌ เกิดข้อผิดพลาด';
+      }
+    })
+    .catch(() => {
+      document.getElementById('otpCode').textContent = '❌ ไม่สามารถสร้างรหัสได้';
+    });
 }
 
 async function tryResultOTP() {
@@ -1793,6 +1796,34 @@ async function tryOTPRetake() {
     alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว\nกรุณาขอรหัสใหม่จากผู้ดูแล');
   }
 }
+
+function copyOTP() {
+  const otp = document.getElementById('otpCode')?.textContent;
+  if (!otp || otp.length !== 6) return;
+  navigator.clipboard.writeText(otp).then(() => {
+    alert('✅ คัดลอกรหัส ' + otp + ' แล้ว');
+  }).catch(() => { alert('รหัสสอบใหม่: ' + otp); });
+}
+
+function clearExamState() {
+  try {
+    localStorage.removeItem('examDone');
+    localStorage.removeItem('examLocked');
+    localStorage.removeItem('examTimeLeft');
+    localStorage.removeItem('examCurrentQ');
+    localStorage.removeItem('examAnswers');
+    localStorage.removeItem('examSession');
+    localStorage.removeItem('examStudent');
+    localStorage.removeItem('examWarnings');
+    localStorage.removeItem('retakeOTP');
+  } catch(e) {}
+  examLocked = false; examActive = false;
+  examSession = []; answers = {};
+  currentQ = 0; warnings = 0;
+  student = {}; stopTimer();
+}
+
+function allowRetake() {}
 
 function restartExam() {
   // เคลียร์ฟอร์ม
@@ -2617,11 +2648,13 @@ async function sendResultToSheets(r, passed, timeUsed) {
   try {
     const now = new Date();
     const dateStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-    const data = {
+    const params = new URLSearchParams({
+      action: 'saveResult',
       date: dateStr,
       firstName: student.firstName || student.name,
       lastName: student.lastName || '',
       branch: student.branch || '',
+      examTitle: examSettings.title,
       score: r.score,
       maxScore: examSettings.maxScore,
       pct: (r.pct * 100).toFixed(1) + '%',
@@ -2629,17 +2662,10 @@ async function sendResultToSheets(r, passed, timeUsed) {
       wrong: r.total - r.correct,
       timeUsed: timeUsed,
       warnings: warnings,
-      passed: passed ? 'ผ่าน' : 'ไม่ผ่าน',
-      examTitle: examSettings.title
-    };
-    await fetch(SHEETS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      passed: passed ? 'ผ่าน' : 'ไม่ผ่าน'
     });
+    await fetch(SHEETS_URL + '?' + params.toString());
   } catch(e) {
-    // ไม่แสดง error ให้นักเรียนเห็น
     console.log('Sheets error:', e);
   }
 }
