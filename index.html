@@ -969,6 +969,8 @@
         <label>จำกัดเวลาสอบ</label>
         <select id="timeLimit">
           <option value="0">ไม่จำกัดเวลา</option>
+          <option value="1">1 นาที</option>
+          <option value="5">5 นาที</option>
           <option value="10">10 นาที</option>
           <option value="15">15 นาที</option>
           <option value="20">20 นาที</option>
@@ -1352,6 +1354,19 @@ async function loadFromGitHub() {
     maxWarnings = examSettings.maxWarnings;
 
     document.getElementById('loadingScreen').remove();
+
+    // ตรวจสอบว่าถูกล็อคอยู่หรือเปล่า
+    try {
+      const isLocked = sessionStorage.getItem('examLocked');
+      if (isLocked === 'true') {
+        examLocked = true;
+        examActive = false;
+        examTimeLeft = parseInt(sessionStorage.getItem('examTimeLeft') || '0');
+        showPage('lockedPage');
+        return;
+      }
+    } catch(e) {}
+
     showPage('loginPage');
     document.getElementById('loginExamTitle').textContent = examSettings.title;
   } catch(e) {
@@ -2539,6 +2554,11 @@ function lockExam() {
   examLocked = true;
   examActive = false;
   stopTimer();
+  // บันทึกสถานะล็อคใน sessionStorage ป้องกันเปิดลิงก์ใหม่แล้วเข้าสอบได้
+  try {
+    sessionStorage.setItem('examLocked', 'true');
+    sessionStorage.setItem('examTimeLeft', examTimeLeft);
+  } catch(e) {}
   document.getElementById('warningPopup').style.display = 'none';
   document.body.classList.remove('exam-active');
   showPage('lockedPage');
@@ -2569,33 +2589,29 @@ function unlockExam() {
   examLocked = false;
   examActive = true;
   warnings = maxWarnings;
+  try { sessionStorage.removeItem('examLocked'); } catch(e) {}
   document.body.classList.add('exam-active');
   const ls = document.getElementById('lockedSection');
   if (ls) ls.style.display = 'none';
   updateMonitor();
-  // แสดง alert ก่อน แล้วค่อยพากลับหน้าสอบ
-  setTimeout(() => {
-    alert('🔓 ปลดล็อคแล้ว กำลังกลับสู่หน้าสอบ...');
-    showPage('examPage');
-    renderQuestion();
-    // restart timer ถ้ายังมีเวลาเหลือ
-    if (examSettings.timeLimit > 0 && examTimeLeft > 0) {
-      // ต่อจากเวลาที่เหลือ ไม่ reset
-      const display = document.getElementById('timerDisplay');
-      if (display) display.style.display = 'flex';
-      clearInterval(examTimer);
-      examTimer = setInterval(() => {
-        examTimeLeft--;
-        updateTimerDisplay();
-        if (examTimeLeft === 300) alert('⏱ เหลือเวลาอีก 5 นาที!');
-        if (examTimeLeft <= 0) {
-          clearInterval(examTimer);
-          alert('⏱ หมดเวลาสอบแล้ว!');
-          submitExam();
-        }
-      }, 1000);
-    }
-  }, 100);
+  showPage('examPage');
+  renderQuestion();
+  // ต่อ timer จากเวลาที่เหลือ ไม่ reset
+  if (examSettings.timeLimit > 0 && examTimeLeft > 0) {
+    const display = document.getElementById('timerDisplay');
+    if (display) display.style.display = 'flex';
+    clearInterval(examTimer);
+    examTimer = setInterval(() => {
+      examTimeLeft--;
+      updateTimerDisplay();
+      if (examTimeLeft === 300) alert('⏱ เหลือเวลาอีก 5 นาที!');
+      if (examTimeLeft <= 0) {
+        clearInterval(examTimer);
+        alert('⏱ หมดเวลาสอบแล้ว!');
+        submitExam();
+      }
+    }, 1000);
+  }
 }
 
 // ============================================================
