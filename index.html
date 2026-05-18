@@ -1246,6 +1246,7 @@
 // STATE
 // ============================================================
 let questions = [];
+let examSession = []; // ข้อสอบที่สุ่มแล้ว ใช้ตอนสอบจริง
 let answers = {};
 let currentQ = 0;
 let warnings = 0;
@@ -2171,8 +2172,8 @@ function startExam() {
     return { ...q, choices: shuffledChoices, answer: newAnswer, _originalId: q.id };
   });
 
-  // ใช้ข้อสอบที่สุ่มแล้ว (เก็บไว้ใน session เท่านั้น ไม่กระทบต้นฉบับ)
-  window._examSession = examQuestions;
+  // ใช้ข้อสอบที่สุ่มแล้ว
+  examSession = examQuestions;
 
   document.body.classList.add('exam-active');
   document.getElementById('totalQNum').textContent = examQuestions.length;
@@ -2188,7 +2189,7 @@ function startExam() {
 }
 
 function renderQuestion() {
-  const examQ = window._examSession || questions;
+  const examQ = examSession;
   const q = examQ[currentQ];
   if (!q) return;
 
@@ -2238,7 +2239,7 @@ function renderQuestion() {
 }
 
 function selectAnswer(idx) {
-  const examQ = window._examSession || questions;
+  const examQ = examSession;
   const q = examQ[currentQ];
   if (!q) return;
   answers[q.id] = idx;
@@ -2250,7 +2251,7 @@ function selectAnswer(idx) {
 }
 
 function nextQuestion() {
-  const examQ = window._examSession || questions;
+  const examQ = examSession;
   if (currentQ < examQ.length - 1) {
     currentQ++;
     renderQuestion();
@@ -2267,7 +2268,7 @@ function prevQuestion() {
 }
 
 function submitExam() {
-  const examQ = window._examSession || questions;
+  const examQ = examSession;
   const unanswered = examQ.filter(q => answers[q.id] === undefined).length;
   if (unanswered > 0 && examTimeLeft > 0) {
     if (!confirm(`ยังมี ${unanswered} ข้อที่ยังไม่ได้ตอบ\nต้องการส่งข้อสอบใช่หรือไม่?`)) return;
@@ -2279,7 +2280,7 @@ function submitExam() {
 }
 
 function calculateResult() {
-  const examQ = window._examSession || questions;
+  const examQ = examSession;
   let correct = 0;
   const detail = examQ.map((q, i) => {
     const selIdx = answers[q.id];
