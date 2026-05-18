@@ -1400,6 +1400,15 @@ async function loadFromGitHub() {
       }
     } catch(e) {}
 
+    // ตรวจสอบว่าสอบเสร็จแล้วหรือเปล่า → ต้องขอ OTP
+    try {
+      const isDone = localStorage.getItem('examDone');
+      if (isDone === 'true') {
+        showDoneGatePage();
+        return;
+      }
+    } catch(e) {}
+
     showPage('loginPage');
     document.getElementById('loginExamTitle').textContent = examSettings.title;
   } catch(e) {
@@ -1632,6 +1641,61 @@ function switchMode(mode) {
   }
 }
 
+// หน้าแสดงเมื่อสอบเสร็จแล้วและพยายามเข้าใหม่
+function showDoneGatePage() {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('mainHeader').style.display = 'none';
+  document.getElementById('modeBar').style.display = 'none';
+  document.body.innerHTML += `
+    <div id="doneGate" style="position:fixed;inset:0;background:linear-gradient(160deg,#0f2348,#1a3a6b);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;color:white;font-family:'Kanit',sans-serif;text-align:center;">
+      <div style="font-size:56px;margin-bottom:16px;">✅</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:10px;">คุณส่งข้อสอบแล้ว</div>
+      <div style="font-size:14px;opacity:0.8;line-height:1.7;margin-bottom:28px;">คุณได้ทำข้อสอบนี้เสร็จสิ้นแล้ว<br>หากต้องการสอบใหม่ กรุณาขอรหัสจากผู้ดูแล</div>
+      <div style="width:100%;max-width:300px;">
+        <input type="text" id="doneOTPInput" placeholder="รหัส 6 หลัก จากผู้ดูแล" maxlength="6" inputmode="numeric"
+          style="width:100%;padding:14px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;font-size:20px;text-align:center;letter-spacing:6px;outline:none;font-family:'Kanit',sans-serif;"
+          onkeydown="if(event.key==='Enter')tryDoneOTP()">
+        <button onclick="tryDoneOTP()" style="width:100%;margin-top:12px;padding:13px;background:#e8a020;border:none;border-radius:12px;color:white;font-family:'Kanit',sans-serif;font-size:15px;font-weight:700;cursor:pointer;">
+          🔄 สอบใหม่ด้วยรหัส
+        </button>
+      </div>
+    </div>`;
+}
+
+function tryDoneOTP() {
+  const input = document.getElementById('doneOTPInput')?.value.trim();
+  let savedOTP = null;
+  try { savedOTP = localStorage.getItem('retakeOTP'); } catch(e) {}
+  if (!savedOTP || input !== savedOTP) {
+    alert('❌ รหัสไม่ถูกต้องหรือหมดอายุแล้ว\nกรุณาขอรหัสใหม่จากผู้ดูแล');
+    if (document.getElementById('doneOTPInput')) document.getElementById('doneOTPInput').value = '';
+    return;
+  }
+  // ล้าง OTP และสถานะทั้งหมด
+  try {
+    localStorage.removeItem('retakeOTP');
+    localStorage.removeItem('examDone');
+    localStorage.removeItem('examLocked');
+    localStorage.removeItem('examTimeLeft');
+    localStorage.removeItem('examCurrentQ');
+    localStorage.removeItem('examAnswers');
+    localStorage.removeItem('examSession');
+    localStorage.removeItem('examStudent');
+    localStorage.removeItem('examWarnings');
+  } catch(e) {}
+  currentOTP = null;
+  examLocked = false;
+  examActive = false;
+  examSession = [];
+  answers = {};
+  currentQ = 0;
+  warnings = 0;
+  student = {};
+  stopTimer();
+  // reload หน้าเพื่อเริ่มใหม่สะอาด
+  window.location.reload();
+}
+
 let currentOTP = null;
 
 function generateRetakeOTP() {
@@ -1671,7 +1735,10 @@ function tryOTPRetake() {
   }
 
   // ล้าง OTP ทันที (ใช้ได้ครั้งเดียว)
-  try { localStorage.removeItem('retakeOTP'); } catch(e) {}
+  try {
+    localStorage.removeItem('retakeOTP');
+    localStorage.removeItem('examDone');
+  } catch(e) {}
   currentOTP = null;
 
   // ล้างสถานะสอบทั้งหมด
@@ -2452,6 +2519,8 @@ function submitExam() {
   stopTimer();
   examActive = false;
   document.body.classList.remove('exam-active');
+  // บันทึกว่าสอบเสร็จแล้ว
+  try { localStorage.setItem('examDone', 'true'); } catch(e) {}
   calculateResult();
 }
 
