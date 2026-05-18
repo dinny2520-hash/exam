@@ -2133,25 +2133,28 @@ function saveSettings() {
 // ============================================================
 function startTimer(minutes) {
   clearInterval(examTimer);
+  if (!minutes || minutes === 0) {
+    stopTimer();
+    return;
+  }
   examTimeLeft = minutes * 60;
   const display = document.getElementById('timerDisplay');
-  const text = document.getElementById('timerText');
-  if (!display || minutes === 0) return;
+  if (!display) return;
   display.style.display = 'flex';
+  display.style.background = '#eef3fb';
+  display.style.color = 'var(--primary)';
   updateTimerDisplay();
   examTimer = setInterval(() => {
     examTimeLeft--;
     updateTimerDisplay();
-    // เตือนเมื่อเหลือ 5 นาที
     if (examTimeLeft === 300) {
-      document.getElementById('timerDisplay').style.background = '#fff4e0';
-      document.getElementById('timerDisplay').style.color = '#c87000';
+      display.style.background = '#fff4e0';
+      display.style.color = '#c87000';
       alert('⏱ เหลือเวลาอีก 5 นาที!');
     }
-    // เตือนเมื่อเหลือ 1 นาที
     if (examTimeLeft === 60) {
-      document.getElementById('timerDisplay').style.background = '#fde';
-      document.getElementById('timerDisplay').style.color = 'var(--danger)';
+      display.style.background = '#fde';
+      display.style.color = 'var(--danger)';
     }
     if (examTimeLeft <= 0) {
       clearInterval(examTimer);
@@ -2565,13 +2568,34 @@ function adminUnlock() {
 function unlockExam() {
   examLocked = false;
   examActive = true;
-  warnings = maxWarnings; // still at limit but allows continuing
+  warnings = maxWarnings;
   document.body.classList.add('exam-active');
-  document.getElementById('lockedSection').style.display = 'none';
-  showPage('examPage');
-  renderQuestion();
+  const ls = document.getElementById('lockedSection');
+  if (ls) ls.style.display = 'none';
   updateMonitor();
-  alert('🔓 ปลดล็อคแล้ว นักเรียนสามารถทำข้อสอบต่อได้');
+  // แสดง alert ก่อน แล้วค่อยพากลับหน้าสอบ
+  setTimeout(() => {
+    alert('🔓 ปลดล็อคแล้ว กำลังกลับสู่หน้าสอบ...');
+    showPage('examPage');
+    renderQuestion();
+    // restart timer ถ้ายังมีเวลาเหลือ
+    if (examSettings.timeLimit > 0 && examTimeLeft > 0) {
+      // ต่อจากเวลาที่เหลือ ไม่ reset
+      const display = document.getElementById('timerDisplay');
+      if (display) display.style.display = 'flex';
+      clearInterval(examTimer);
+      examTimer = setInterval(() => {
+        examTimeLeft--;
+        updateTimerDisplay();
+        if (examTimeLeft === 300) alert('⏱ เหลือเวลาอีก 5 นาที!');
+        if (examTimeLeft <= 0) {
+          clearInterval(examTimer);
+          alert('⏱ หมดเวลาสอบแล้ว!');
+          submitExam();
+        }
+      }, 1000);
+    }
+  }, 100);
 }
 
 // ============================================================
