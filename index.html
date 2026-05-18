@@ -1361,7 +1361,13 @@ async function loadFromGitHub() {
       if (isLocked === 'true') {
         examLocked = true;
         examActive = false;
+        // โหลดสถานะกลับมาทั้งหมด
         examTimeLeft = parseInt(localStorage.getItem('examTimeLeft') || '0');
+        currentQ = parseInt(localStorage.getItem('examCurrentQ') || '0');
+        warnings = parseInt(localStorage.getItem('examWarnings') || '0');
+        try { answers = JSON.parse(localStorage.getItem('examAnswers') || '{}'); } catch(e) { answers = {}; }
+        try { examSession = JSON.parse(localStorage.getItem('examSession') || '[]'); } catch(e) { examSession = []; }
+        try { student = JSON.parse(localStorage.getItem('examStudent') || '{}'); } catch(e) { student = {}; }
         showPage('lockedPage');
         return;
       }
@@ -2554,10 +2560,16 @@ function lockExam() {
   examLocked = true;
   examActive = false;
   stopTimer();
-  // บันทึกสถานะล็อคใน sessionStorage ป้องกันเปิดลิงก์ใหม่แล้วเข้าสอบได้
+  // บันทึกสถานะล็อคใน localStorage ป้องกันเปิดลิงก์ใหม่แล้วเข้าสอบได้
   try {
+    sessionStorage.setItem('admin_auth', sessionStorage.getItem('admin_auth') || '');
     localStorage.setItem('examLocked', 'true');
     localStorage.setItem('examTimeLeft', examTimeLeft);
+    localStorage.setItem('examCurrentQ', currentQ);
+    localStorage.setItem('examAnswers', JSON.stringify(answers));
+    localStorage.setItem('examSession', JSON.stringify(examSession));
+    localStorage.setItem('examStudent', JSON.stringify(student));
+    localStorage.setItem('examWarnings', warnings);
   } catch(e) {}
   document.getElementById('warningPopup').style.display = 'none';
   document.body.classList.remove('exam-active');
@@ -2589,7 +2601,15 @@ function unlockExam() {
   examLocked = false;
   examActive = true;
   warnings = maxWarnings;
-  try { localStorage.removeItem('examLocked'); } catch(e) {}
+  try {
+    localStorage.removeItem('examLocked');
+    localStorage.removeItem('examTimeLeft');
+    localStorage.removeItem('examCurrentQ');
+    localStorage.removeItem('examAnswers');
+    localStorage.removeItem('examSession');
+    localStorage.removeItem('examStudent');
+    localStorage.removeItem('examWarnings');
+  } catch(e) {}
   document.body.classList.add('exam-active');
   const ls = document.getElementById('lockedSection');
   if (ls) ls.style.display = 'none';
