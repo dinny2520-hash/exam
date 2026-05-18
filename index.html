@@ -43,6 +43,19 @@
     -webkit-touch-callout: default !important;
   }
 
+  /* ปุ่มทุกตัวต้องกดได้บนมือถือ */
+  button, .choice-btn, .btn {
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+
+  /* ตอนสอบ ห้าม select text แต่ปุ่มยังกดได้ */
+  body.exam-active {
+    -webkit-touch-callout: none;
+  }
+
   /* ป้องกัน screenshot บน iOS/Android */
   body.exam-active {
     -webkit-touch-callout: none;
@@ -560,9 +573,16 @@
     border-top: 1px solid var(--border);
     z-index: 100;
     box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+    pointer-events: auto;
   }
 
-  .nav-btns .btn { flex: 1; padding: 12px 8px; font-size: 14px; }
+  .nav-btns .btn {
+    flex: 1;
+    padding: 14px 8px;
+    font-size: 15px;
+    pointer-events: auto;
+    touch-action: manipulation;
+  }
 
   /* ========== RESULT PAGE ========== */
   .result-page { padding: 20px 16px 40px; max-width: 500px; margin: 0 auto; text-align: center; }
@@ -863,6 +883,20 @@
         <input type="number" id="maxScore" value="100" min="1">
       </div>
       <div class="form-group">
+        <label>จำกัดเวลาสอบ</label>
+        <select id="timeLimit">
+          <option value="0">ไม่จำกัดเวลา</option>
+          <option value="10">10 นาที</option>
+          <option value="15">15 นาที</option>
+          <option value="20">20 นาที</option>
+          <option value="30">30 นาที</option>
+          <option value="45">45 นาที</option>
+          <option value="60">60 นาที</option>
+          <option value="90">90 นาที</option>
+          <option value="120">120 นาที</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>จำนวนครั้งที่ออกจากหน้าได้ (ก่อนล็อค)</label>
         <select id="maxWarnings">
           <option value="1">1 ครั้ง</option>
@@ -972,6 +1006,7 @@
   </div>
   <div class="exam-info-bar">
     <div>ข้อ <strong id="currentQNum">1</strong> / <strong id="totalQNum">0</strong></div>
+    <div id="timerDisplay" style="display:none;font-weight:700;font-size:13px;color:var(--primary);background:#eef3fb;padding:4px 10px;border-radius:20px;">⏱ <span id="timerText">00:00</span></div>
     <div class="warning-counter wc-0" id="warningCounter">
       ✓ ออกจากหน้า: <strong id="warningCount">0</strong>/<strong id="maxWarn">2</strong>
     </div>
@@ -1134,11 +1169,14 @@ let warnings = 0;
 let maxWarnings = 2;
 let examActive = false;
 let examLocked = false;
+let examTimer = null;
+let examTimeLeft = 0;
 let examSettings = {
   title: 'แบบทดสอบ',
   maxScore: 100,
   maxWarnings: 2,
-  unlockCode: '1234'
+  unlockCode: '1234',
+  timeLimit: 0
 };
 let student = {};
 let examResults = null;
@@ -1362,8 +1400,8 @@ function applySettings() {
   document.getElementById('maxScore').value = examSettings.maxScore;
   document.getElementById('maxWarnings').value = examSettings.maxWarnings;
   document.getElementById('unlockCode').value = examSettings.unlockCode;
+  document.getElementById('timeLimit').value = examSettings.timeLimit || 0;
   maxWarnings = examSettings.maxWarnings;
-  // โหลดรายชื่อสาขา
   if (document.getElementById('branchList') && examSettings.branches) {
     document.getElementById('branchList').value = (examSettings.branches || []).join('\n');
   }
@@ -1946,14 +1984,79 @@ function saveSettings() {
   examSettings.maxScore = parseInt(document.getElementById('maxScore').value) || 100;
   examSettings.maxWarnings = parseInt(document.getElementById('maxWarnings').value);
   examSettings.unlockCode = document.getElementById('unlockCode').value || '1234';
+  examSettings.timeLimit = parseInt(document.getElementById('timeLimit').value) || 0;
   maxWarnings = examSettings.maxWarnings;
   saveToStorage();
   alert('✅ บันทึกการตั้งค่าแล้ว');
 }
 
 // ============================================================
+// TIMER
+// ============================================================
+function startTimer(minutes) {
+  clearInterval(examTimer);
+  examTimeLeft = minutes * 60;
+  const display = document.getElementById('timerDisplay');
+  const text = document.getElementById('timerText');
+  if (!display || minutes === 0) return;
+  display.style.display = 'flex';
+  updateTimerDisplay();
+  examTimer = setInterval(() => {
+    examTimeLeft--;
+    updateTimerDisplay();
+    // เตือนเมื่อเหลือ 5 นาที
+    if (examTimeLeft === 300) {
+      document.getElementById('timerDisplay').style.background = '#fff4e0';
+      document.getElementById('timerDisplay').style.color = '#c87000';
+      alert('⏱ เหลือเวลาอีก 5 นาที!');
+    }
+    // เตือนเมื่อเหลือ 1 นาที
+    if (examTimeLeft === 60) {
+      document.getElementById('timerDisplay').style.background = '#fde';
+      document.getElementById('timerDisplay').style.color = 'var(--danger)';
+    }
+    if (examTimeLeft <= 0) {
+      clearInterval(examTimer);
+      alert('⏱ หมดเวลาสอบแล้ว! ระบบจะส่งข้อสอบอัตโนมัติ');
+      submitExam();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(examTimeLeft / 60);
+  const s = examTimeLeft % 60;
+  const text = document.getElementById('timerText');
+  if (text) text.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function stopTimer() {
+  clearInterval(examTimer);
+  examTimer = null;
+  const display = document.getElementById('timerDisplay');
+  if (display) display.style.display = 'none';
+}
+
+function formatTimeUsed() {
+  const total = examSettings.timeLimit * 60;
+  const used = total - examTimeLeft;
+  const m = Math.floor(used / 60);
+  const s = used % 60;
+  return `${m} นาที ${s} วินาที`;
+}
+
+// ============================================================
 // EXAM FLOW
 // ============================================================
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function startExam() {
   const firstName = document.getElementById('studentFirstName').value.trim();
   const lastName = document.getElementById('studentLastName').value.trim();
@@ -1968,22 +2071,49 @@ function startExam() {
   examLocked = false;
   examActive = true;
   maxWarnings = examSettings.maxWarnings;
+
+  // ===== สุ่มข้อสอบ =====
+  // สุ่มลำดับข้อ
+  let examQuestions = shuffleArray(questions);
+
+  // สุ่มลำดับตัวเลือก ก.ข.ค.ง. ในแต่ละข้อ
+  examQuestions = examQuestions.map(q => {
+    // จับคู่ตัวเลือกกับเฉลย
+    const correctText = q.choices[choiceLabels.indexOf(q.answer)];
+    // สุ่มลำดับ choices
+    const shuffledChoices = shuffleArray(q.choices.filter(c => c));
+    // หาเฉลยใหม่หลังสุ่ม
+    const newAnswerIdx = shuffledChoices.indexOf(correctText);
+    const newAnswer = choiceLabels[newAnswerIdx] || 'ก';
+    return { ...q, choices: shuffledChoices, answer: newAnswer, _originalId: q.id };
+  });
+
+  // ใช้ข้อสอบที่สุ่มแล้ว (เก็บไว้ใน session เท่านั้น ไม่กระทบต้นฉบับ)
+  window._examSession = examQuestions;
+
   document.body.classList.add('exam-active');
-  document.getElementById('totalQNum').textContent = questions.length;
+  document.getElementById('totalQNum').textContent = examQuestions.length;
   document.getElementById('maxWarn').textContent = maxWarnings;
   updateMonitor();
   showPage('examPage');
   renderQuestion();
+  if (examSettings.timeLimit > 0) {
+    startTimer(examSettings.timeLimit);
+  } else {
+    stopTimer();
+  }
 }
 
 function renderQuestion() {
-  const q = questions[currentQ];
+  const examQ = window._examSession || questions;
+  const q = examQ[currentQ];
+  if (!q) return;
+
   document.getElementById('currentQNum').textContent = currentQ + 1;
-  document.getElementById('totalQNum').textContent = questions.length;
-  const pct = ((currentQ) / questions.length * 100).toFixed(0);
+  document.getElementById('totalQNum').textContent = examQ.length;
+  const pct = (currentQ / examQ.length * 100).toFixed(0);
   document.getElementById('progressFill').style.width = pct + '%';
 
-  // Warning counter style
   const wc = document.getElementById('warningCounter');
   document.getElementById('warningCount').textContent = warnings;
   wc.className = 'warning-counter wc-' + Math.min(warnings, 2);
@@ -1992,40 +2122,56 @@ function renderQuestion() {
   else wc.innerHTML = `🚨 ออกจากหน้า: <strong>${warnings}</strong>/<strong>${maxWarnings}</strong>`;
 
   const selected = answers[q.id] ?? null;
+
+  const choicesHTML = q.choices.map((c, i) => {
+    const isSelected = selected === i;
+    return `<button
+      type="button"
+      class="choice-btn ${isSelected ? 'selected' : ''}"
+      ontouchend="event.preventDefault();selectAnswer(${i})"
+      onclick="selectAnswer(${i})"
+      style="pointer-events:auto;">
+      <span class="choice-key">${choiceLabels[i]}</span>
+      <span style="flex:1;word-break:break-word;">${c || '-'}</span>
+    </button>`;
+  }).join('');
+
   document.getElementById('questionCard').innerHTML = `
     <div class="q-header">
-      <span class="q-num-badge">ข้อ ${currentQ+1}</span>
+      <span class="q-num-badge">ข้อ ${currentQ + 1}</span>
       <div class="q-text-main">${q.text}</div>
     </div>
-    <div class="choices">
-      ${q.choices.map((c,i) => `
-        <button class="choice-btn ${selected === i ? 'selected' : ''}" onclick="selectAnswer(${i})">
-          <span class="choice-key">${choiceLabels[i]}</span>
-          <span>${c}</span>
-        </button>
-      `).join('')}
-    </div>
+    <div class="choices">${choicesHTML}</div>
   `;
 
   // Nav buttons
-  document.getElementById('prevBtn').style.visibility = currentQ > 0 ? 'visible' : 'hidden';
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const submitBtn = document.getElementById('submitBtn');
+  prevBtn.style.visibility = currentQ > 0 ? 'visible' : 'hidden';
   const isLast = currentQ === questions.length - 1;
-  document.getElementById('nextBtn').classList.toggle('hidden', isLast);
-  document.getElementById('submitBtn').classList.toggle('hidden', !isLast);
+  nextBtn.classList.toggle('hidden', isLast);
+  submitBtn.classList.toggle('hidden', !isLast);
 }
 
 function selectAnswer(idx) {
-  const q = questions[currentQ];
+  const examQ = window._examSession || questions;
+  const q = examQ[currentQ];
+  if (!q) return;
   answers[q.id] = idx;
-  renderQuestion();
+  document.querySelectorAll('.choice-btn').forEach((btn, i) => {
+    btn.classList.toggle('selected', i === idx);
+    btn.querySelector('.choice-key').style.background = i === idx ? 'var(--primary)' : '';
+    btn.querySelector('.choice-key').style.color = i === idx ? 'white' : '';
+  });
 }
 
 function nextQuestion() {
-  if (currentQ < questions.length - 1) {
+  const examQ = window._examSession || questions;
+  if (currentQ < examQ.length - 1) {
     currentQ++;
     renderQuestion();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    document.getElementById('examPage').scrollTop = 0;
+    window.scrollTo(0, 0);
   }
 }
 
@@ -2033,24 +2179,26 @@ function prevQuestion() {
   if (currentQ > 0) {
     currentQ--;
     renderQuestion();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    document.getElementById('examPage').scrollTop = 0;
+    window.scrollTo(0, 0);
   }
 }
 
 function submitExam() {
-  const unanswered = questions.filter(q => answers[q.id] === undefined).length;
-  if (unanswered > 0) {
+  const examQ = window._examSession || questions;
+  const unanswered = examQ.filter(q => answers[q.id] === undefined).length;
+  if (unanswered > 0 && examTimeLeft > 0) {
     if (!confirm(`ยังมี ${unanswered} ข้อที่ยังไม่ได้ตอบ\nต้องการส่งข้อสอบใช่หรือไม่?`)) return;
   }
+  stopTimer();
   examActive = false;
   document.body.classList.remove('exam-active');
   calculateResult();
 }
 
 function calculateResult() {
+  const examQ = window._examSession || questions;
   let correct = 0;
-  const detail = questions.map((q, i) => {
+  const detail = examQ.map((q, i) => {
     const selIdx = answers[q.id];
     const sel = selIdx !== undefined ? choiceLabels[selIdx] : null;
     const isCorrect = sel === q.answer;
@@ -2058,10 +2206,9 @@ function calculateResult() {
     return { q, sel, isCorrect, selIdx };
   });
 
-  const pct = questions.length > 0 ? (correct / questions.length) : 0;
+  const pct = examQ.length > 0 ? (correct / examQ.length) : 0;
   const score = Math.round(pct * examSettings.maxScore);
-
-  examResults = { correct, total: questions.length, score, pct, detail };
+  examResults = { correct, total: examQ.length, score, pct, detail };
   showResult(examResults);
 }
 
@@ -2102,6 +2249,7 @@ function showResult(r) {
     <div class="result-row"><span class="label">คะแนนที่ได้</span><span class="value" style="font-size:18px;color:var(--primary)">${r.score} / ${examSettings.maxScore}</span></div>
     <div class="result-row"><span class="label">คิดเป็น</span><span class="value">${(r.pct*100).toFixed(1)}%</span></div>
     <div class="result-row"><span class="label">ออกจากหน้า</span><span class="value">${warnings} ครั้ง</span></div>
+    ${examSettings.timeLimit > 0 ? `<div class="result-row"><span class="label">เวลาที่ใช้</span><span class="value">${formatTimeUsed()}</span></div>` : ''}
   `;
 
   document.getElementById('reviewList').innerHTML = '<div style="font-family:\'Kanit\',sans-serif;font-size:15px;font-weight:600;margin-bottom:12px;color:var(--primary);">รายละเอียดแต่ละข้อ</div>' +
@@ -2237,6 +2385,7 @@ function dismissWarning() {
 function lockExam() {
   examLocked = true;
   examActive = false;
+  stopTimer();
   document.getElementById('warningPopup').style.display = 'none';
   document.body.classList.remove('exam-active');
   showPage('lockedPage');
