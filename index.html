@@ -1412,6 +1412,24 @@ async function loadFromGitHub() {
 
     document.getElementById('loadingScreen').remove();
 
+    // ตรวจสอบ version ของชุดข้อสอบ — ถ้าเปลี่ยนชุดใหม่ ล้างสถานะเก่าทั้งหมด
+    try {
+      const newVersion = examSettings.examVersion || questions.length.toString();
+      const savedVersion = localStorage.getItem('examVersion');
+      if (savedVersion && savedVersion !== newVersion) {
+        // ชุดข้อสอบเปลี่ยนแล้ว — ล้างทุกอย่าง
+        localStorage.removeItem('examLocked');
+        localStorage.removeItem('examDone');
+        localStorage.removeItem('examTimeLeft');
+        localStorage.removeItem('examCurrentQ');
+        localStorage.removeItem('examAnswers');
+        localStorage.removeItem('examSession');
+        localStorage.removeItem('examStudent');
+        localStorage.removeItem('examWarnings');
+      }
+      localStorage.setItem('examVersion', newVersion);
+    } catch(e) {}
+
     // ตรวจสอบว่าถูกล็อคอยู่หรือเปล่า
     try {
       const isLocked = localStorage.getItem('examLocked');
@@ -1461,6 +1479,8 @@ function showExamQR() {
 
 function downloadQuestionsJSON() {
   if (questions.length === 0) { alert('กรุณาเพิ่มข้อสอบก่อน'); return; }
+  // เพิ่ม version ใหม่ทุกครั้งที่ดาวน์โหลด เพื่อ reset สถานะนักเรียนอัตโนมัติ
+  examSettings.examVersion = Date.now().toString();
   const data = { questions, settings: examSettings };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
