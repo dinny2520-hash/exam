@@ -1170,7 +1170,7 @@
 
     <!-- ปลดล็อคปกติ -->
     <p style="font-size:12px;opacity:0.5;margin-bottom:8px;">— ปลดล็อคโดยเจ้าหน้าที่ —</p>
-    <input type="password" class="unlock-input" id="unlockInput" placeholder="รหัสเจ้าหน้าที่..." maxlength="20" inputmode="text" onkeydown="if(event.key==='Enter')tryUnlock()">
+    <input type="password" class="unlock-input" id="unlockInput" placeholder="รหัสเจ้าหน้าที่..." maxlength="20" inputmode="text" autocomplete="off" autocorrect="off" onkeydown="if(event.key==='Enter')tryUnlock()">
     <div style="margin-top:12px;">
       <button class="btn btn-accent" onclick="tryUnlock()" style="width:auto;padding:11px 32px;">🔓 ปลดล็อค</button>
     </div>
@@ -2836,6 +2836,11 @@ function unlockExam() {
     localStorage.removeItem('examSession');
     localStorage.removeItem('examStudent');
     localStorage.removeItem('examWarnings');
+  } catch(e) {}
+  // ล้างช่องรหัสและ blur ทันที
+  try {
+    const inp = document.getElementById('unlockInput');
+    if (inp) { inp.value = ''; inp.type = 'text'; inp.blur(); inp.type = 'password'; }
   } catch(e) {}
   document.body.classList.add('exam-active');
   const ls = document.getElementById('lockedSection');
