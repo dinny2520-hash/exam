@@ -2806,11 +2806,11 @@ function lockExam() {
 
 function tryUnlock() {
   const code = document.getElementById('unlockInput').value.trim();
+  document.getElementById('unlockInput').value = ''; // ล้างทันทีไม่ว่าจะถูกหรือผิด
   if (code === examSettings.unlockCode) {
     unlockExam();
   } else {
     alert('รหัสไม่ถูกต้อง');
-    document.getElementById('unlockInput').value = '';
   }
 }
 
