@@ -1005,10 +1005,11 @@
     <div class="section-card">
       <div class="section-title">แชร์ข้อสอบให้นักเรียน</div>
       <div class="alert alert-info">
-        วิธีใหม่: ดาวน์โหลดไฟล์ข้อสอบ แล้วอัปโหลดขึ้น GitHub พร้อมกับ index.html<br>
-        นักเรียนเปิด <strong>https://dinny2520-hash.github.io/exam/</strong> ได้เลย URL สั้น ไม่มีโค้ดยาวๆ
+        ดาวน์โหลดไฟล์ข้อสอบแล้วอัปโหลดขึ้น GitHub<br>
+        นักเรียนเปิด <strong>dinny2520-hash.github.io/exam/</strong> หรือสแกน QR ได้เลย
       </div>
       <button class="btn btn-accent" onclick="downloadQuestionsJSON()">⬇️ ดาวน์โหลดไฟล์ข้อสอบ (questions.json)</button>
+      <button class="btn btn-primary" onclick="showExamQR()" style="margin-top:10px;">📱 แสดง QR Code สำหรับนักเรียน</button>
       <div style="margin-top:10px;font-size:12px;color:var(--text-muted);">
         หลังดาวน์โหลด → อัปโหลด questions.json ขึ้น GitHub repo เดียวกับ index.html
       </div>
@@ -1183,6 +1184,22 @@
         <button class="btn btn-outline" onclick="tryOTPRetake()" style="width:auto;padding:11px 32px;background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.4);">🔄 เริ่มสอบใหม่</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ===== QR OVERLAY ===== -->
+<div id="examQROverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:20px;padding:28px 24px;width:100%;max-width:360px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.3);">
+    <div style="font-family:'Kanit',sans-serif;font-size:17px;font-weight:700;color:var(--primary);margin-bottom:6px;">📱 QR Code สำหรับนักเรียน</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">สแกนเพื่อเข้าสอบได้เลย</div>
+    <div style="display:inline-block;padding:12px;border:2px solid var(--border);border-radius:12px;margin-bottom:12px;">
+      <img id="examQRImg" src="" alt="QR" style="width:200px;height:200px;display:block;">
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">หรือเปิดลิงก์นี้</div>
+    <div style="background:#eef3fb;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--primary);font-weight:600;word-break:break-all;margin-bottom:16px;">
+      https://dinny2520-hash.github.io/exam/
+    </div>
+    <button class="btn btn-outline" onclick="document.getElementById('examQROverlay').style.display='none'">ปิด</button>
   </div>
 </div>
 
@@ -1435,6 +1452,13 @@ async function loadFromGitHub() {
 }
 
 // ดาวน์โหลดข้อสอบเป็น questions.json
+function showExamQR() {
+  const url = 'https://dinny2520-hash.github.io/exam/';
+  const qrURL = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(url);
+  document.getElementById('examQRImg').src = qrURL;
+  document.getElementById('examQROverlay').style.display = 'flex';
+}
+
 function downloadQuestionsJSON() {
   if (questions.length === 0) { alert('กรุณาเพิ่มข้อสอบก่อน'); return; }
   const data = { questions, settings: examSettings };
