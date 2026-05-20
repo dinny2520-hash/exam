@@ -1721,6 +1721,23 @@ function showDoneGatePage() {
 
 let currentOTP = null;
 
+// ส่งสถานะไป Google Sheets
+async function sendStatus(status, note = '') {
+  try {
+    await callSheets({
+      action: 'updateStatus',
+      firstName: student.firstName || student.name || '',
+      lastName: student.lastName || '',
+      branch: student.branch || '',
+      status: status,
+      warnings: warnings,
+      note: note
+    });
+  } catch(e) {
+    console.log('sendStatus error:', e);
+  }
+}
+
 // เรียก Sheets ด้วย fetch GET (Apps Script รองรับ CORS สำหรับ GET)
 function callSheets(params) {
   const url = SHEETS_URL + '?' + new URLSearchParams(params).toString();
@@ -2509,6 +2526,8 @@ function startExam() {
   updateMonitor();
   showPage('examPage');
   renderQuestion();
+  // ส่งสถานะ: เริ่มสอบ
+  sendStatus('✅ กำลังสอบ', 'เริ่มสอบแล้ว');
   if (examSettings.timeLimit > 0) {
     startTimer(examSettings.timeLimit);
   } else {
@@ -2627,7 +2646,7 @@ function calculateResult() {
   showResult(examResults);
 }
 
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyzDomRB8ueDvuOvVg6w25lfjHUXbGDhMDgYuW3hvvceYsZxftgMd1Yv11l7CA2Y9S7/exec';
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxlmAf_fzj99z0yF94H6y_hqhULHLh68WxjEMfjMV-Zs7QUJ2y7opZ885GowUIUVy1O/exec';
 const PASS_PERCENT = 0.70; // เกณฑ์ผ่าน 70%
 
 function showResult(r) {
@@ -2669,6 +2688,9 @@ function showResult(r) {
   `;
 
   document.getElementById('reviewList').innerHTML = '';
+
+  // ส่งสถานะ: สอบเสร็จ (จะลบออกจาก sheet กำลังสอบ)
+  sendStatus('🏁 สอบเสร็จ', `${r.score}/${examSettings.maxScore} (${(r.pct*100).toFixed(1)}%) - ${passed ? 'ผ่าน' : 'ไม่ผ่าน'}`);
 
   // ส่งผลสอบไป Google Sheets
   sendResultToSheets(r, passed, timeUsed);
@@ -2820,6 +2842,8 @@ function lockExam() {
   } catch(e) {}
   document.getElementById('warningPopup').style.display = 'none';
   document.body.classList.remove('exam-active');
+  // ส่งสถานะ: ถูกล็อค
+  sendStatus('🔒 ถูกล็อค', 'ออกจากหน้าเกิน ' + maxWarnings + ' ครั้ง');
   showPage('lockedPage');
   updateMonitor(true);
 }
