@@ -663,11 +663,11 @@
   ],
   "settings": {
     "title": "แบบทดสอบ",
-    "maxScore": 45,
+    "maxScore": 60,
     "maxWarnings": 2,
     "unlockCode": "2520",
-    "timeLimit": 60,
+    "timeLimit": 45,
     "githubURL": "https://dinny2520-hash.github.io/exam/",
-    "examVersion": "1779430505068"
+    "examVersion": "1779430667197"
   }
 }
