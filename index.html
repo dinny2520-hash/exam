@@ -943,6 +943,7 @@
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" onclick="exportExcel()">📊 ส่งออก Excel</button>
         <button class="btn btn-outline btn-sm" onclick="exportPrint()">🖨️ พิมพ์/PDF</button>
+        <button class="btn btn-outline btn-sm" onclick="autoRestoreFromGitHub(true)">📥 โหลดจาก GitHub</button>
         <button class="btn btn-danger btn-sm" onclick="clearQuestions()" style="margin-left:auto;">🗑 ลบทั้งหมด</button>
       </div>
     </div>
@@ -1386,6 +1387,35 @@ function init() {
   updateReadyAlert();
   setupAntiCheat();
   checkAdminLogin();
+
+  // ถ้าไม่มีข้อสอบในเครื่อง (localStorage ว่าง/ถูกล้าง) ลองดึงจาก GitHub อัตโนมัติ
+  if (questions.length === 0) {
+    autoRestoreFromGitHub();
+  }
+}
+
+// ดึงข้อสอบ+ตั้งค่าล่าสุดจาก GitHub กลับมาแสดง (ใช้เมื่อ localStorage หายหรือกดด้วยตนเอง)
+async function autoRestoreFromGitHub(manual = false) {
+  const githubURL = (examSettings.githubURL || '').trim() || 'https://dinny2520-hash.github.io/exam/';
+  try {
+    const res = await fetch(githubURL.replace(/\/$/, '') + '/questions.json?t=' + Date.now());
+    if (!res.ok) throw new Error('not found');
+    const data = await res.json();
+    if (data.questions && data.questions.length > 0) {
+      questions = data.questions;
+      examSettings = { ...examSettings, ...(data.settings || {}) };
+      maxWarnings = examSettings.maxWarnings;
+      saveToStorage();
+      renderQuestionList();
+      updateReadyAlert();
+      applySettings();
+      if (manual) alert('✅ โหลดข้อสอบล่าสุดจาก GitHub สำเร็จ (' + questions.length + ' ข้อ)');
+    } else if (manual) {
+      alert('ไม่พบข้อสอบใน GitHub');
+    }
+  } catch(e) {
+    if (manual) alert('❌ ไม่สามารถโหลดจาก GitHub ได้\nตรวจสอบว่าตั้งค่า GitHub URL ถูกต้อง และมีไฟล์ questions.json อยู่จริง');
+  }
 }
 
 // โหลดข้อสอบจาก questions.json บน GitHub
