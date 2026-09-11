@@ -1774,6 +1774,15 @@ function callSheets(params) {
   return fetch(url).then(r => r.json());
 }
 
+// สำหรับข้อมูลยาว (เช่น รายละเอียดคำตอบทั้งชุด) ใช้ POST แทน GET เพื่อไม่ให้เกิน URL length limit
+function callSheetsPost(params) {
+  return fetch(SHEETS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' }, // ใช้ text/plain เพื่อหลีก CORS preflight
+    body: JSON.stringify(params)
+  }).then(r => r.json());
+}
+
 function generateRetakeOTP() {
   const code = document.getElementById('retakeAdminCode').value.trim();
   if (code !== examSettings.unlockCode) {
@@ -1831,6 +1840,30 @@ async function sendResultToSheets(r, passed, timeUsed) {
     });
   } catch(e) {
     console.log('Sheets save error:', e);
+  }
+}
+
+// ส่งรายละเอียดคำตอบแต่ละข้อ (ให้เฉพาะผู้ดูแลดูได้ ผ่าน Google Sheets)
+async function sendAnswerDetailToSheets(r) {
+  try {
+    const now = new Date();
+    const dateStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    const details = r.detail.map(d => ({
+      text: d.q.text,
+      selectedText: d.sel ? `${d.sel}. ${d.q.choices[d.selIdx] || ''}` : '',
+      correctText: `${d.q.answer}. ${d.q.choices[choiceLabels.indexOf(d.q.answer)] || ''}`,
+      isCorrect: d.isCorrect
+    }));
+    await callSheetsPost({
+      action: 'saveAnswerDetail',
+      date: dateStr,
+      firstName: student.firstName || student.name || '',
+      lastName: student.lastName || '',
+      branch: student.branch || '',
+      details: JSON.stringify(details)
+    });
+  } catch(e) {
+    console.log('Answer detail send error:', e);
   }
 }
 
@@ -2724,6 +2757,8 @@ function showResult(r) {
 
   // ส่งผลสอบไป Google Sheets
   sendResultToSheets(r, passed, timeUsed);
+  // ส่งรายละเอียดคำตอบแต่ละข้อไป Google Sheets (สำหรับผู้ดูแลตรวจสอบเท่านั้น)
+  sendAnswerDetailToSheets(r);
 }
 
 
