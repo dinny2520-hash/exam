@@ -1769,18 +1769,35 @@ async function sendStatus(status, note = '') {
 }
 
 // เรียก Sheets ด้วย fetch GET (Apps Script รองรับ CORS สำหรับ GET)
+// ลองส่งซ้ำอัตโนมัติถ้าล้มเหลวหรือ Sheets ตอบว่า busy (กรณีหลายคนส่งพร้อมกัน)
+async function withRetry(fn, tries = 4) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fn();
+      if (res && res.status === 'busy') throw new Error('busy');
+      return res;
+    } catch (e) {
+      lastErr = e;
+      // รอแบบเพิ่มขึ้นเรื่อยๆ + สุ่มเล็กน้อยกันทุกคนลองซ้ำพร้อมกันอีก
+      await new Promise(r => setTimeout(r, 1000 * (i + 1) + Math.random() * 1500));
+    }
+  }
+  throw lastErr;
+}
+
 function callSheets(params) {
   const url = SHEETS_URL + '?' + new URLSearchParams(params).toString();
-  return fetch(url).then(r => r.json());
+  return withRetry(() => fetch(url).then(r => r.json()));
 }
 
 // สำหรับข้อมูลยาว (เช่น รายละเอียดคำตอบทั้งชุด) ใช้ POST แทน GET เพื่อไม่ให้เกิน URL length limit
 function callSheetsPost(params) {
-  return fetch(SHEETS_URL, {
+  return withRetry(() => fetch(SHEETS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' }, // ใช้ text/plain เพื่อหลีก CORS preflight
     body: JSON.stringify(params)
-  }).then(r => r.json());
+  }).then(r => r.json()));
 }
 
 function generateRetakeOTP() {
@@ -1846,14 +1863,21 @@ async function sendResultToSheets(r, passed, timeUsed) {
 // ส่งรายละเอียดคำตอบแต่ละข้อ (ให้เฉพาะผู้ดูแลดูได้ ผ่าน Google Sheets)
 async function sendAnswerDetailToSheets(r) {
   try {
+    // หน่วงแบบสุ่ม 0-3 วินาที กระจายโหลดเมื่อหลายคนกดส่งพร้อมกัน
+    await new Promise(res => setTimeout(res, Math.random() * 3000));
     const now = new Date();
     const dateStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-    const details = r.detail.map(d => ({
-      text: d.q.text,
-      selectedText: d.sel ? `${d.sel}. ${d.q.choices[d.selIdx] || ''}` : '',
-      correctText: `${d.q.answer}. ${d.q.choices[choiceLabels.indexOf(d.q.answer)] || ''}`,
-      isCorrect: d.isCorrect
-    }));
+    // ส่งเฉพาะข้อที่ตอบผิดหรือไม่ได้ตอบ (เก็บเลขข้อตามลำดับที่นักเรียนเห็นไว้ด้วย)
+    const details = r.detail
+      .map((d, i) => ({
+        no: i + 1,
+        text: d.q.text,
+        selectedText: d.sel ? `${d.sel}. ${d.q.choices[d.selIdx] || ''}` : '',
+        correctText: `${d.q.answer}. ${d.q.choices[choiceLabels.indexOf(d.q.answer)] || ''}`,
+        isCorrect: d.isCorrect
+      }))
+      .filter(d => !d.isCorrect);
+    if (details.length === 0) return; // ตอบถูกทุกข้อ ไม่ต้องบันทึกอะไร
     await callSheetsPost({
       action: 'saveAnswerDetail',
       date: dateStr,
