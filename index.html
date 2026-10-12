@@ -1509,6 +1509,9 @@ function showExamQR() {
 
 function downloadQuestionsJSON() {
   if (questions.length === 0) { alert('กรุณาเพิ่มข้อสอบก่อน'); return; }
+  // อ่านค่าจากช่องตั้งค่าล่าสุดก่อนทุกครั้ง (กันลืมกดบันทึกการตั้งค่า)
+  syncSettingsFromForm();
+  saveToStorage();
   // เพิ่ม version ใหม่ทุกครั้งที่ดาวน์โหลด เพื่อ reset สถานะนักเรียนอัตโนมัติ
   examSettings.examVersion = Date.now().toString();
   const data = { questions, settings: examSettings };
@@ -1520,7 +1523,7 @@ function downloadQuestionsJSON() {
   a.click();
   URL.revokeObjectURL(a.href);
   setTimeout(() => {
-    alert('✅ ดาวน์โหลด questions.json แล้ว!\n\nขั้นตอนต่อไป:\n1. ไปที่ GitHub repo\n2. กด Add file → Upload files\n3. อัปโหลด questions.json\n4. กด Commit changes\n\nนักเรียนเปิด https://dinny2520-hash.github.io/exam/ ได้เลย!');
+    alert('✅ ดาวน์โหลด questions.json แล้ว!\n\nค่าที่ใส่ในไฟล์:\n• ข้อสอบ ' + questions.length + ' ข้อ\n• คะแนนเต็ม ' + examSettings.maxScore + '\n• เวลา ' + (examSettings.timeLimit ? examSettings.timeLimit + ' นาที' : 'ไม่จำกัด') + '\n\nขั้นตอนต่อไป:\n1. ไปที่ GitHub repo\n2. กด Add file → Upload files\n3. อัปโหลด questions.json\n4. กด Commit changes\n\nนักเรียนเปิด https://dinny2520-hash.github.io/exam/ ได้เลย!');
   }, 500);
 }
 
@@ -2491,7 +2494,8 @@ function renderBranchDropdown() {
     branches.map(b => `<option>${b}</option>`).join('');
 }
 
-function saveSettings() {
+// อ่านค่าจากช่องในหน้าตั้งค่าเข้า examSettings (ไม่แสดง alert)
+function syncSettingsFromForm() {
   examSettings.title = document.getElementById('examTitle').value || 'แบบทดสอบ';
   examSettings.githubURL = document.getElementById('githubURL').value.trim().replace(/\/$/, '') + '/';
   examSettings.maxScore = parseInt(document.getElementById('maxScore').value) || 100;
@@ -2499,6 +2503,10 @@ function saveSettings() {
   examSettings.unlockCode = document.getElementById('unlockCode').value || '1234';
   examSettings.timeLimit = parseInt(document.getElementById('timeLimit').value) || 0;
   maxWarnings = examSettings.maxWarnings;
+}
+
+function saveSettings() {
+  syncSettingsFromForm();
   saveToStorage();
   alert('✅ บันทึกการตั้งค่าแล้ว');
 }
