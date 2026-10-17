@@ -1755,25 +1755,29 @@ function showDoneGatePage() {
 let currentOTP = null;
 
 // ส่งสถานะไป Google Sheets
-async function sendStatus(status, note = '') {
-  try {
-    await callSheets({
-      action: 'updateStatus',
-      firstName: student.firstName || student.name || '',
-      lastName: student.lastName || '',
-      branch: student.branch || '',
-      status: status,
-      warnings: warnings,
-      note: note
-    });
-  } catch(e) {
-    console.log('sendStatus error:', e);
-  }
+// ส่งสถานะไป Google Sheets — เข้าคิวส่งทีละอันตามลำดับ (เริ่มสอบ -> ล็อค -> เสร็จ)
+// และแนบเวลา (ts) เพื่อให้ Sheets เมินคำสั่งเก่าที่มาถึงช้ากว่า
+let statusQueue = Promise.resolve();
+function sendStatus(status, note = '') {
+  const payload = {
+    action: 'updateStatus',
+    firstName: student.firstName || student.name || '',
+    lastName: student.lastName || '',
+    branch: student.branch || '',
+    status: status,
+    warnings: warnings,
+    note: note,
+    ts: Date.now()
+  };
+  statusQueue = statusQueue
+    .then(() => callSheets(payload))
+    .catch(e => console.log('sendStatus error:', e));
+  return statusQueue;
 }
 
 // เรียก Sheets ด้วย fetch GET (Apps Script รองรับ CORS สำหรับ GET)
 // ลองส่งซ้ำอัตโนมัติถ้าล้มเหลวหรือ Sheets ตอบว่า busy (กรณีหลายคนส่งพร้อมกัน)
-async function withRetry(fn, tries = 4) {
+async function withRetry(fn, tries = 6) {
   let lastErr;
   for (let i = 0; i < tries; i++) {
     try {
@@ -1782,8 +1786,8 @@ async function withRetry(fn, tries = 4) {
       return res;
     } catch (e) {
       lastErr = e;
-      // รอแบบเพิ่มขึ้นเรื่อยๆ + สุ่มเล็กน้อยกันทุกคนลองซ้ำพร้อมกันอีก
-      await new Promise(r => setTimeout(r, 1000 * (i + 1) + Math.random() * 1500));
+      // รอแบบเพิ่มขึ้นเรื่อยๆ (สูงสุด 8 วินาที) + สุ่มเล็กน้อยกันทุกคนลองซ้ำพร้อมกัน
+      await new Promise(r => setTimeout(r, Math.min(1500 * (i + 1), 8000) + Math.random() * 2000));
     }
   }
   throw lastErr;
