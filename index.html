@@ -763,6 +763,10 @@
   .q-ctx .q-box { border-color: #1a4fa3; background: #fff; }
   .q-ctx .q-table td { border-color: #8fb0e6; }
   .q-ctx-mini { font-size: 12px; color: #1a4fa3; background: #f0f6ff; border-left: 3px solid #1a4fa3; border-radius: 4px; padding: 3px 8px; margin: 4px 0 6px; line-height: 1.5; }
+  /* หัวข้อที่สอบ (แถบด้านบนของข้อ) */
+  .q-sec { display: flex; align-items: baseline; gap: 8px; color: #1a4fa3; font-weight: 700; font-size: 15px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #cfe0f7; line-height: 1.5; }
+  .q-sec-label { flex-shrink: 0; background: #1a4fa3; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 12px; }
+  .q-sec-chip { display: inline-block; margin-left: 8px; padding: 1px 10px; border-radius: 12px; background: #e3eefc; color: #1a4fa3; font-size: 11px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -886,7 +890,7 @@
       <div class="alert alert-info">
         📌 <strong>Excel/CSV:</strong> คอลัมน์ A=คำถาม, B=ก., C=ข., D=ค., E=ง., F=เฉลย (ก/ข/ค/ง) หรือจะทำ<strong style="color:#c0392b">ตัวหนังสือของตัวเลือกที่ถูกเป็นสีแดง</strong>แทนก็ได้ (ไม่ต้องใส่ F)<br>
         📌 <strong>Word (.docx):</strong> พิมพ์ข้อสอบตามปกติ (1. คำถาม / ก. ข. ค. ง.) แล้วทำ<strong style="color:#c0392b">ตัวหนังสือของคำตอบที่ถูกเป็นสีแดง</strong> ระบบตั้งเฉลยให้เอง และแนบรูปภาพ กรอบ ตารางในข้อสอบมาด้วย<br>
-        📌 <strong style="color:#1a4fa3">ตัวหนังสือสีน้ำเงิน</strong> = หัวข้อหรือข้อความที่ต้องอ่านประกอบการตอบ ระบบแสดงให้ในข้อที่ตามมา (ถ้าในข้อความมีคำว่า "ข้อ 3-4" จะแสดงเฉพาะข้อ 3-4) — Excel ให้ใส่ในช่อง A แถวใหม่ที่ไม่มีตัวเลือก
+        📌 <strong style="color:#1a4fa3">ตัวหนังสือสีน้ำเงิน</strong> = <strong>หัวข้อที่สอบ</strong> (สั้น บรรทัดเดียว ใช้ต่อทั้งหมวดจนกว่าจะขึ้นหัวข้อใหม่) และ <strong>ข้อมูลที่ต้องอ่านประกอบการตอบ</strong> (ยาว/หลายบรรทัด ถ้าเขียนว่า "ข้อ 3-4" จะแสดงเฉพาะข้อ 3-4) — Excel ให้ใส่ในช่อง A แถวใหม่ที่ไม่มีตัวเลือก
       </div>
 
       <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
@@ -1272,7 +1276,11 @@
       <button class="edit-modal-close" onclick="closeEditModal()">✕</button>
     </h3>
     <div class="form-group">
-      <label style="color:#1a4fa3;">📖 หัวข้อ / ข้อมูลที่ต้องอ่านประกอบ (สีน้ำเงินในไฟล์) <span id="editCtxShared" style="font-weight:400;font-size:11px;"></span></label>
+      <label style="color:#1a4fa3;">📘 หัวข้อที่สอบ (สีน้ำเงินสั้นๆ ในไฟล์) <span id="editSecShared" style="font-weight:400;font-size:11px;"></span></label>
+      <textarea id="editSec" style="min-height:40px;border-color:#9fb8e8;" placeholder="เว้นว่างถ้าไม่มีหัวข้อ"></textarea>
+    </div>
+    <div class="form-group">
+      <label style="color:#1a4fa3;">📖 ข้อมูลที่ต้องอ่านประกอบการตอบ (สีน้ำเงินในไฟล์) <span id="editCtxShared" style="font-weight:400;font-size:11px;"></span></label>
       <textarea id="editCtx" style="min-height:60px;border-color:#9fb8e8;" placeholder="เว้นว่างถ้าข้อนี้ไม่มีข้อมูลประกอบ"></textarea>
     </div>
     <div class="form-group">
@@ -1379,6 +1387,7 @@ function init() {
       if (!json) throw new Error('decompress failed');
       const data = JSON.parse(json);
       questions = data.questions || [];
+      ensureUniqueIds(questions);
       examSettings = { ...examSettings, ...(data.settings || {}) };
       maxWarnings = examSettings.maxWarnings;
       document.getElementById('mainHeader').style.display = 'none';
@@ -1390,6 +1399,7 @@ function init() {
         const json = decodeURIComponent(atob(hash.slice(6)));
         const data = JSON.parse(json);
         questions = data.questions || [];
+        ensureUniqueIds(questions);
         examSettings = { ...examSettings, ...(data.settings || {}) };
         maxWarnings = examSettings.maxWarnings;
         document.getElementById('mainHeader').style.display = 'none';
@@ -1426,6 +1436,7 @@ async function autoRestoreFromGitHub(manual = false) {
     const data = await res.json();
     if (data.questions && data.questions.length > 0) {
       questions = data.questions;
+      ensureUniqueIds(questions);
       examSettings = { ...examSettings, ...(data.settings || {}) };
       maxWarnings = examSettings.maxWarnings;
       saveToStorage();
@@ -1460,6 +1471,7 @@ async function loadFromGitHub() {
     if (!res.ok) throw new Error('ไม่พบไฟล์ข้อสอบ');
     const data = await res.json();
     questions = data.questions || [];
+    ensureUniqueIds(questions);
     examSettings = { ...examSettings, ...(data.settings || {}) };
     maxWarnings = examSettings.maxWarnings;
 
@@ -1631,7 +1643,7 @@ function submitAdminLogin() {
 function loadFromStorage() {
   try {
     const q = localStorage.getItem('exam_questions');
-    if (q) questions = JSON.parse(q);
+    if (q) { questions = JSON.parse(q); ensureUniqueIds(questions); }
     const s = localStorage.getItem('exam_settings');
     if (s) examSettings = { ...examSettings, ...JSON.parse(s) };
     applySettings();
@@ -1705,7 +1717,7 @@ let _quotaWarned = false;
 function saveToStorage() {
   try { // ลบหัวข้อ/ข้อมูลประกอบที่ไม่มีข้อสอบข้อไหนอ้างถึงแล้ว
     if (examSettings.contexts) {
-      const used = {}; questions.forEach(function (q) { if (q.ctxId) used[q.ctxId] = 1; });
+      const used = {}; questions.forEach(function (q) { if (q.ctxId) used[q.ctxId] = 1; if (q.secId) used[q.secId] = 1; });
       Object.keys(examSettings.contexts).forEach(function (id) { if (!used[id]) delete examSettings.contexts[id]; });
     }
   } catch (e) {}
@@ -2380,6 +2392,14 @@ const IMP = (function () {
       if (c2 && (!chain || c2.length > chain.length)) chain = c2;
     }
     if (!chain) return null;
+    let fixed = false;
+    if (chain.length >= 2 && chain.length < 4) { // เช่น พิมพ์ "ก. ข. ข. ง." แทน "ก. ข. ค. ง."
+      const extra = findLabels(seg, RE_STRICT).filter(function (c) { return c.start > chain[chain.length - 1].start; });
+      if (extra.length === 4 - chain.length && extra[extra.length - 1].letter === 'ง') {
+        extra.forEach(function (c) { chain.push({ letter: LETTERS[chain.length], start: c.start, end: c.end }); });
+        fixed = true;
+      }
+    }
 
     const n = chain.length, last = chain[n - 1];
     let segEnd = seg.length;
@@ -2397,7 +2417,7 @@ const IMP = (function () {
     const stem = cleanStem((b.boxOpen ? '[[box]]\n' : '') + seg.slice(0, chain[0].start));
     if (!stem) return null;
     const dec = decideAnswer(reds, n, ansLetter);
-    return { no: b.no, text: stem, choices: choices, ansIdx: dec.ans, how: dec.how, firstAbs: b.bodyStart + chain[0].start };
+    return { no: b.no, text: stem, choices: choices, ansIdx: dec.ans, how: dec.how, firstAbs: b.bodyStart + chain[0].start, fixed: fixed };
   }
 
   /* ---------- หัวข้อ / ข้อมูลประกอบ (ตัวหนังสือสีน้ำเงิน) ---------- */
@@ -2408,6 +2428,21 @@ const IMP = (function () {
     const lo = parseInt(m[1], 10), hi = parseInt(m[2], 10);
     return lo <= hi ? { lo: lo, hi: hi } : null;
   }
+  // แยกก้อนสีน้ำเงินเป็น หัวข้อ (สั้น) และ/หรือ ข้อมูลประกอบ (ยาว มีตาราง/รูป หรือบอกให้ตอบข้อ ...)
+  function blockParts(body) {
+    const lines = body.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    const plainLine = function (l) { return !/\{\{img:|\[\[|¦/.test(l); };
+    const headLike = function (l) { return plainLine(l) && l.length <= 80 && !/ตอบ|ด้านล่าง|ต่อไปนี้|ข้อ\s*\d/.test(l) && !/^(•|\d+[.)])/.test(l); };
+    if (lines.length && lines.length <= 2 && lines.every(headLike)) return [{ kind: 'heading', text: lines.join('\n'), range: null }];
+    if (lines.length >= 2 && headLike(lines[0])) {
+      const rest = body.slice(body.indexOf(lines[0]) + lines[0].length).replace(/^\s+/, '');
+      return [{ kind: 'heading', text: lines[0], range: null }, { kind: 'info', text: rest, range: parseRange(rest) }];
+    }
+    return [{ kind: 'info', text: body, range: parseRange(body) }];
+  }
+  // รหัสประจำข้อ: ตัวเลขจำนวนเต็มที่ไม่ซ้ำกันแน่นอน (เดิมใช้เวลา+เลขสุ่ม ซ้ำกันได้เมื่อนำเข้าหลายข้อในเสี้ยววินาทีเดียว)
+  let _qSeq = 0;
+  function newQId() { _qSeq = (_qSeq + 1) % 1000; return Date.now() * 1000 + _qSeq; }
   let _ctxSeq = 0;
   function newCtxId() { _ctxSeq++; return 'c' + Date.now().toString(36) + _ctxSeq.toString(36) + Math.random().toString(36).slice(2, 5); }
 
@@ -2454,12 +2489,13 @@ const IMP = (function () {
       kept.push({ s: s, e: e, body: body });
     });
     let out = '', outMask = [], pos = 0; const ctxs = [];
-    kept.forEach(function (k, idx) {
+    kept.forEach(function (k) {
       out += text.slice(pos, k.s);
       for (let i = pos; i < k.s; i++) outMask.push(mask[i]);
-      const ph = '\n<<CTX:' + idx + '>>\n';
+      let ph = '';
+      blockParts(k.body).forEach(function (part) { ph += '\n<<CTX:' + ctxs.length + '>>'; ctxs.push(part); });
+      ph += '\n';
       out += ph; for (let i = 0; i < ph.length; i++) outMask.push(0);
-      ctxs.push({ text: k.body, range: parseRange(k.body) });
       pos = k.e;
     });
     out += text.slice(pos); for (let i = pos; i < text.length; i++) outMask.push(mask[i]);
@@ -2477,20 +2513,36 @@ const IMP = (function () {
     starts.forEach(function (st, i) {
       const b = { s: st.s, bodyStart: st.bodyStart, e: i + 1 < starts.length ? starts[i + 1].s : text.length, no: st.no, boxOpen: st.boxOpen };
       const q = parseBlock(text, mask, b);
-      if (q) questions.push(q); else warnings.push('ข้อ ' + st.no + ': ไม่พบตัวเลือก ก. ข. จึงข้ามไป');
+      if (q) { questions.push(q); if (q.fixed) warnings.push('ข้อ ' + st.no + ': ป้ายตัวเลือกพิมพ์ไม่เรียง ก-ข-ค-ง (เช่น พิมพ์ซ้ำ) ระบบจัดเรียงให้แล้ว ตรวจข้อนี้ด้วย'); }
+      else warnings.push('ข้อ ' + st.no + ': ไม่พบตัวเลือก ก. ข. จึงข้ามไป');
     });
-    // จับคู่หัวข้อ/ข้อมูลประกอบกับข้อสอบ: ใช้ก้อนล่าสุดที่อยู่ก่อนตัวเลือกของข้อนั้น (ถ้าเขียน "ข้อ 3-4" ใช้เฉพาะข้อ 3-4)
+    // จับคู่หัวข้อ/ข้อมูลประกอบกับข้อสอบ
+    //  - หัวข้อ: ใช้กับทุกข้อที่ตามมาจนกว่าจะขึ้นหัวข้อใหม่
+    //  - ข้อมูลประกอบ: ถ้าเขียน "ข้อ 3-4" ใช้ตามช่วงนั้น (ถ้าเลขไม่ตรงกับข้อที่ตามมา ใช้จำนวนข้อเท่ากันแทน) ถ้าไม่ระบุใช้จนกว่าจะมีหัวข้อ/ข้อมูลใหม่
     const phs = []; const re = /<<CTX:(\d+)>>/g; let m;
     while ((m = re.exec(text)) !== null) phs.push({ k: +m[1], pos: m.index });
-    let pi = 0, defK = -1; const ranged = [];
-    questions.forEach(function (q) {
+    let pi = 0, secK = -1, defK = -1; const ranged = [];
+    questions.forEach(function (q, qi) {
       while (pi < phs.length && phs[pi].pos < q.firstAbs) {
-        const c = ex.ctxs[phs[pi].k];
-        if (c.range) ranged.push({ k: phs[pi].k, lo: c.range.lo, hi: c.range.hi }); else defK = phs[pi].k;
+        const k = phs[pi].k, c = ex.ctxs[k];
+        if (c.kind === 'heading') { secK = k; defK = -1; }
+        else if (c.range) {
+          const n = c.range.hi - c.range.lo + 1;
+          if (q.no >= c.range.lo && q.no <= c.range.hi) ranged.push({ k: k, byNo: true, lo: c.range.lo, hi: c.range.hi });
+          else {
+            const lastQ = questions[Math.min(qi + n - 1, questions.length - 1)];
+            ranged.push({ k: k, byNo: false, lo: qi, hi: qi + n - 1 });
+            warnings.push('ข้อมูลประกอบที่เขียนว่า "ข้อ ' + c.range.lo + '-' + c.range.hi + '" ไม่ตรงกับข้อที่ตามมา (ข้อ ' + q.no + ') จึงใช้กับ ' + n + ' ข้อถัดไป (ข้อ ' + q.no + '–' + lastQ.no + ') ตรวจเลขในไฟล์ด้วย');
+          }
+        } else defK = k;
         pi++;
       }
+      q.secK = secK;
       let k = defK;
-      for (let r = ranged.length - 1; r >= 0; r--) { if (q.no >= ranged[r].lo && q.no <= ranged[r].hi) { k = ranged[r].k; break; } }
+      for (let r = ranged.length - 1; r >= 0; r--) {
+        const g = ranged[r], hit = g.byNo ? (q.no >= g.lo && q.no <= g.hi) : (qi >= g.lo && qi <= g.hi);
+        if (hit) { k = g.k; break; }
+      }
       q.ctxK = k;
     });
     return { questions: questions, warnings: warnings, ctxs: ex.ctxs };
@@ -2567,18 +2619,20 @@ const IMP = (function () {
     const parsed = parseQuestions(d.text, d.mask);
     const questions = [], meta = [], contexts = {}, idOfK = {};
     parsed.questions.forEach(function (p) {
-      const q = { id: Date.now() + Math.random(), text: p.text, choices: p.choices, answer: LETTERS[p.ansIdx >= 0 ? p.ansIdx : 0] };
+      const q = { id: newQId(), text: p.text, choices: p.choices, answer: LETTERS[p.ansIdx >= 0 ? p.ansIdx : 0] };
       if (p.ansIdx < 0) q.needsAnswer = true;
       const imgs = remapImages(q, d.imgs);
       if (imgs.length) q.imgs = imgs;
-      if (p.ctxK >= 0) {
-        if (!idOfK[p.ctxK]) {
-          const obj = { text: cleanStem(parsed.ctxs[p.ctxK].text), choices: [] };
+      const idFor = function (k) {
+        if (!idOfK[k]) {
+          const obj = { text: cleanStem(parsed.ctxs[k].text), choices: [] };
           const cimgs = remapImages(obj, d.imgs);
-          const id = newCtxId(); contexts[id] = { text: obj.text, imgs: cimgs }; idOfK[p.ctxK] = id;
+          const id = newCtxId(); contexts[id] = { text: obj.text, imgs: cimgs }; idOfK[k] = id;
         }
-        q.ctxId = idOfK[p.ctxK];
-      }
+        return idOfK[k];
+      };
+      if (p.secK >= 0) q.secId = idFor(p.secK);
+      if (p.ctxK >= 0) q.ctxId = idFor(p.ctxK);
       questions.push(q); meta.push({ no: p.no, how: p.how });
     });
     const withImgs = questions.concat(Object.keys(contexts).map(function (k) { return contexts[k]; }));
@@ -2691,16 +2745,24 @@ const IMP = (function () {
       return { t: t, red: t.length > 0 && k === 1, blue: t.length > 0 && k === 2 };
     }
     const questions = [], meta = [], warnings = [], contexts = {};
-    let defId = null, pending = [], ranged = [], qSeq = 0;
-    function flushPending() {
+    let defId = null, secId = null, pending = [], ranged = [], qSeq = 0;
+    function flushPending(nextSeq) {
       if (!pending.length) return;
-      const text = pending.join('\n');
-      const obj = { text: cleanStem(text), choices: [] };
-      const imgs = remapImages(obj, allImgs);
-      const id = newCtxId(); contexts[id] = { text: obj.text, imgs: imgs };
-      const rg = parseRange(text);
-      if (rg) ranged.push({ id: id, lo: rg.lo, hi: rg.hi }); else defId = id;
-      pending = [];
+      const text = pending.join('\n'); pending = [];
+      blockParts(text).forEach(function (part) {
+        const obj = { text: cleanStem(part.text), choices: [] };
+        const imgs = remapImages(obj, allImgs);
+        const id = newCtxId(); contexts[id] = { text: obj.text, imgs: imgs };
+        if (part.kind === 'heading') { secId = id; defId = null; }
+        else if (part.range) {
+          const n = part.range.hi - part.range.lo + 1;
+          if (nextSeq >= part.range.lo && nextSeq <= part.range.hi) ranged.push({ id: id, lo: part.range.lo, hi: part.range.hi });
+          else {
+            ranged.push({ id: id, lo: nextSeq, hi: nextSeq + n - 1 });
+            warnings.push('ข้อมูลประกอบที่เขียนว่า "ข้อ ' + part.range.lo + '-' + part.range.hi + '" ไม่ตรงกับข้อที่ตามมา (ข้อที่ ' + nextSeq + ') จึงใช้กับ ' + n + ' ข้อถัดไป (ข้อที่ ' + nextSeq + '–' + (nextSeq + n - 1) + ') ตรวจเลขในไฟล์ด้วย');
+          }
+        } else defId = id;
+      });
     }
     for (let r = range.s.r; r <= range.e.r; r++) {
       const q0 = cellInfo(r, 0);
@@ -2710,18 +2772,19 @@ const IMP = (function () {
       const f = cellInfo(r, 5);
       if (q0.blue && !f.t && cs.every(function (c) { return !c.t; })) { pending.push(q0.t); continue; } // แถวสีน้ำเงิน = หัวข้อ/ข้อมูลประกอบ
       if (!cs[0].t) { warnings.push('แถว ' + (r + 1) + ': ไม่มีตัวเลือก ก. จึงข้ามไป'); continue; }
-      flushPending();
+      flushPending(qSeq + 1);
       qSeq++;
       const letter = f.t.charAt(0);
       const nCh = cs.filter(function (c) { return c.t; }).length;
       const dec = decideAnswer(cs.map(function (c) { return c.red; }), nCh, LETTERS.indexOf(letter) >= 0 ? letter : null);
-      const q = { id: Date.now() + Math.random(), text: q0.t, choices: cs.map(function (c) { return c.t; }), answer: LETTERS[dec.ans >= 0 ? dec.ans : 0] };
+      const q = { id: newQId(), text: q0.t, choices: cs.map(function (c) { return c.t; }), answer: LETTERS[dec.ans >= 0 ? dec.ans : 0] };
       if (dec.ans < 0) q.needsAnswer = true;
       const imgs = remapImages(q, allImgs);
       if (imgs.length) q.imgs = imgs;
       let cid = defId;
       for (let i = ranged.length - 1; i >= 0; i--) { if (qSeq >= ranged[i].lo && qSeq <= ranged[i].hi) { cid = ranged[i].id; break; } }
       if (cid) q.ctxId = cid;
+      if (secId) q.secId = secId;
       questions.push(q); meta.push({ no: r + 1 - range.s.r, how: dec.how });
     }
     const withImgs = questions.concat(Object.keys(contexts).map(function (k) { return contexts[k]; }));
@@ -2758,9 +2821,23 @@ const IMP = (function () {
       .replace(/[ \t]*\n[ \t]*/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  return { importDocx: importDocx, importXlsx: importXlsx, renderRich: renderRich, plainText: plainText, esc: esc, _parseQuestions: parseQuestions, _docxToText: docxToText };
+  return { newQId: newQId, importDocx: importDocx, importXlsx: importXlsx, renderRich: renderRich, plainText: plainText, esc: esc, _parseQuestions: parseQuestions, _docxToText: docxToText };
 })();
 // ==== IMPORTER END ====
+
+// ซ่อมรหัสข้อที่ซ้ำกันในข้อสอบเก่า (เกิดได้จากการนำเข้าหลายข้อพร้อมกันในเวอร์ชันก่อน) ใช้เลขติดลบตามตำแหน่ง จึงได้ค่าเดิมทุกครั้งที่โหลด
+function ensureUniqueIds(arr) {
+  if (!Array.isArray(arr)) return 0;
+  const seen = new Set(); let fixed = 0;
+  arr.forEach(function (q, i) {
+    if (q.id === undefined || q.id === null || seen.has(q.id)) {
+      let k = i + 1; while (seen.has(-k)) k += arr.length + 1;
+      q.id = -k; fixed++;
+    }
+    seen.add(q.id);
+  });
+  return fixed;
+}
 
 const renderRich = IMP.renderRich;
 const plainText = IMP.plainText;
@@ -2773,7 +2850,10 @@ function ctxMini(q) {
   const t = plainText(c.text);
   return '<div class="q-ctx-mini">📖 ' + IMP.esc(t.slice(0, 150)) + (t.length > 150 ? '…' : '') + '</div>';
 }
-function ctxUseCount(id) { return questions.filter(function (x) { return x.ctxId === id; }).length; }
+function secOf(q) { return (q && q.secId && examSettings.contexts) ? examSettings.contexts[q.secId] : null; }
+function secHtml(q) { const c = secOf(q); return c ? '<div class="q-sec"><span class="q-sec-label">หัวข้อ</span><span>' + renderRich(c.text, c) + '</span></div>' : ''; }
+function secChip(q) { const c = secOf(q); return c ? '<span class="q-sec-chip">📘 ' + IMP.esc(plainText(c.text).slice(0, 40)) + '</span>' : ''; }
+function ctxUseCount(id) { return questions.filter(function (x) { return x.ctxId === id || x.secId === id; }).length; }
 
 // สรุปผลหลังนำเข้า (ใช้ร่วมกันทั้ง Word และ Excel)
 function finishImport(res) {
@@ -2788,8 +2868,10 @@ function finishImport(res) {
   const red = nosOf('red'), line = nosOf('line'), none = nosOf('none'), amb = nosOf('ambiguous');
   let msg = '✅ นำเข้าข้อสอบ ' + n + ' ข้อ\n• ตั้งเฉลยจากตัวหนังสือสีแดง ' + red.length + ' ข้อ';
   if (line.length) msg += '\n• ตั้งเฉลยจากบรรทัด "เฉลย:" / คอลัมน์ F ' + line.length + ' ข้อ';
-  const nCtx = res.contexts ? Object.keys(res.contexts).length : 0;
-  if (nCtx) msg += '\n• พบหัวข้อ/ข้อมูลประกอบ (สีน้ำเงิน) ' + nCtx + ' ชุด ใช้กับ ' + res.questions.filter(function (q) { return q.ctxId; }).length + ' ข้อ';
+  const nSec = new Set(res.questions.map(function (q) { return q.secId; }).filter(Boolean)).size;
+  const nInfo = new Set(res.questions.map(function (q) { return q.ctxId; }).filter(Boolean)).size;
+  if (nSec) msg += '\n• พบหัวข้อที่สอบ (สีน้ำเงิน) ' + nSec + ' หัวข้อ';
+  if (nInfo) msg += '\n• พบข้อมูลประกอบการตอบ (สีน้ำเงิน) ' + nInfo + ' ชุด ใช้กับ ' + res.questions.filter(function (q) { return q.ctxId; }).length + ' ข้อ';
   if (none.length) msg += '\n\n⚠️ ไม่พบเฉลย ' + none.length + ' ข้อ (' + listNos(none) + ')\n   ตั้งเป็น ก. ไว้ก่อน และมีป้ายเตือนในรายการ ให้กด ✏️ เลือกเฉลยที่ถูก';
   if (amb.length) msg += '\n\n⚠️ พบสีแดงหลายตัวเลือก ' + amb.length + ' ข้อ (' + listNos(amb) + ')\n   ตั้งเป็น ก. ไว้ก่อน ให้กด ✏️ เลือกเฉลยที่ถูก';
   if (res.imgTotal) msg += '\n\n🖼 แนบรูปภาพ ' + res.imgTotal + ' รูป' + (res.imgFailed ? '\n   แสดงไม่ได้ ' + res.imgFailed + ' รูป (รูปแบบไม่รองรับ เช่น EMF/WMF ให้แทรกเป็น PNG/JPG)' : '');
@@ -2849,7 +2931,7 @@ function readExcelLegacy(file) {
         if (i === 0 && typeof row[0] === 'string' && row[0].toLowerCase().includes('คำถาม')) return;
         if (!row[0]) return;
         const q = {
-          id: Date.now() + Math.random(),
+          id: IMP.newQId(),
           text: String(row[0]).trim(),
           choices: [
             String(row[1] || '').trim(),
@@ -3014,7 +3096,7 @@ function extractQFromBlock(block) {
   if (!qText || !choiceMap['ก']) return null;
 
   return {
-    id: Date.now() + Math.random(),
+    id: IMP.newQId(),
     text: qText,
     choices: [choiceMap['ก'], choiceMap['ข'], choiceMap['ค'], choiceMap['ง']],
     answer
@@ -3032,7 +3114,7 @@ function parseLineByLine(lines) {
   const flush = () => {
     if (qText && choices.length >= 2) {
       result.push({
-        id: Date.now() + Math.random(),
+        id: IMP.newQId(),
         text: qText.trim(),
         choices: [choices[0]||'', choices[1]||'', choices[2]||'', choices[3]||''],
         answer
@@ -3070,7 +3152,7 @@ function readCSV(file) {
       const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g,''));
       if (!cols[0] || cols[0].toLowerCase().includes('คำถาม')) return;
       const q = {
-        id: Date.now() + Math.random(),
+        id: IMP.newQId(),
         text: cols[0],
         choices: [cols[1]||'', cols[2]||'', cols[3]||'', cols[4]||''],
         answer: (cols[5]||'ก').charAt(0)
@@ -3100,7 +3182,7 @@ function downloadTemplate() {
 
 function exportExcel() {
   if (questions.length === 0) { alert('ยังไม่มีข้อสอบ'); return; }
-  const header = ['ข้อที่', 'คำถาม', 'ก.', 'ข.', 'ค.', 'ง.', 'เฉลย', 'หัวข้อ/ข้อมูลประกอบ'];
+  const header = ['ข้อที่', 'คำถาม', 'ก.', 'ข.', 'ค.', 'ง.', 'เฉลย', 'หัวข้อที่สอบ', 'ข้อมูลประกอบ'];
   const rows = questions.map((q, i) => [
     i + 1,
     plainText(q.text),
@@ -3109,6 +3191,7 @@ function exportExcel() {
     plainText(q.choices[2] || ''),
     plainText(q.choices[3] || ''),
     q.answer + '.',
+    plainText((secOf(q) || {}).text || ''),
     plainText((ctxOf(q) || {}).text || '')
   ]);
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
@@ -3116,7 +3199,7 @@ function exportExcel() {
   // ปรับความกว้างคอลัมน์
   ws['!cols'] = [
     { wch: 6 }, { wch: 50 }, { wch: 20 }, { wch: 20 },
-    { wch: 20 }, { wch: 20 }, { wch: 8 }, { wch: 50 }
+    { wch: 20 }, { wch: 20 }, { wch: 8 }, { wch: 28 }, { wch: 50 }
   ];
 
   // สีหัวตาราง
@@ -3146,7 +3229,7 @@ function exportPrint() {
   const qHtml = questions.map((q, i) => `
     <div class="pq">
       <div class="pq-num">ข้อที่ ${i + 1}.</div>
-      ${ctxHtml(q)}
+      ${secHtml(q)}${ctxHtml(q)}
       <div class="pq-text">${renderRich(q.text, q)}</div>
       <div class="pq-choices">
         ${q.choices.map((c, ci) => `
@@ -3172,6 +3255,8 @@ function exportPrint() {
     .q-table td { border: 1px solid #000; padding: 3px 8px; }
     .q-img { max-width: 100%; height: auto; }
     .q-ctx { color: #1a4fa3; border-left: 3px solid #1a4fa3; padding: 4px 10px; margin: 4px 0 6px; }
+    .q-sec { color: #1a4fa3; font-weight: 700; margin: 12px 0 4px; }
+    .q-sec-label { border: 1px solid #1a4fa3; border-radius: 8px; padding: 0 6px; margin-right: 6px; font-size: 11px; }
     .meta { text-align: center; font-size: 13px; color: #555; margin-bottom: 24px; }
     .pq { margin-bottom: 20px; page-break-inside: avoid; }
     .pq-num { font-weight: 700; color: #1a3a6b; margin-bottom: 4px; }
@@ -3218,7 +3303,7 @@ function addQuestion() {
   const d = document.getElementById('choiceD').value.trim();
   const ans = document.getElementById('newAnswer').value;
   if (!text || !a || !b || !c || !d) { alert('กรุณากรอกข้อมูลให้ครบ'); return; }
-  questions.push({ id: Date.now(), text, choices: [a,b,c,d], answer: ans });
+  questions.push({ id: IMP.newQId(), text, choices: [a,b,c,d], answer: ans });
   saveToStorage();
   renderQuestionList();
   updateReadyAlert();
@@ -3237,9 +3322,11 @@ function openEditModal(id) {
   if (!q) return;
   editingId = id;
   document.getElementById('editQ').value = q.text;
-  const cx = ctxOf(q);
+  const sc = secOf(q), cx = ctxOf(q);
+  document.getElementById('editSec').value = sc ? sc.text : '';
   document.getElementById('editCtx').value = cx ? cx.text : '';
-  const nUse = cx ? ctxUseCount(q.ctxId) : 0;
+  const nSec = sc ? ctxUseCount(q.secId) : 0, nUse = cx ? ctxUseCount(q.ctxId) : 0;
+  document.getElementById('editSecShared').textContent = nSec > 1 ? '(ใช้ร่วมกับ ' + nSec + ' ข้อ แก้ที่นี่แล้วทุกข้อเปลี่ยนตาม)' : '';
   document.getElementById('editCtxShared').textContent = nUse > 1 ? '(ใช้ร่วมกับ ' + nUse + ' ข้อ แก้ที่นี่แล้วทุกข้อเปลี่ยนตาม)' : '';
   document.getElementById('editA').value = q.choices[0] || '';
   document.getElementById('editB').value = q.choices[1] || '';
@@ -3267,11 +3354,14 @@ function saveEditQuestion() {
   if (!text || !a || !b) { alert('กรุณากรอกคำถามและตัวเลือก ก. ข. อย่างน้อย'); return; }
   questions[idx] = { ...questions[idx], text, choices: [a, b, c, d], answer: ans };
   delete questions[idx].needsAnswer; // ผู้ดูแลตรวจเฉลยแล้ว
-  const ctxText = document.getElementById('editCtx').value.trim();
-  const oldId = questions[idx].ctxId;
-  if (!ctxText) { delete questions[idx].ctxId; }                                    // เอาข้อมูลประกอบออกจากข้อนี้ (ข้ออื่นยังใช้ต่อ)
-  else if (oldId && examSettings.contexts && examSettings.contexts[oldId]) { examSettings.contexts[oldId].text = ctxText; }
-  else { const nid = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); (examSettings.contexts = examSettings.contexts || {})[nid] = { text: ctxText, imgs: [] }; questions[idx].ctxId = nid; }
+  const setCtxField = function (field, text) { // field: 'secId' (หัวข้อ) | 'ctxId' (ข้อมูลประกอบ)
+    const oldId = questions[idx][field];
+    if (!text) { delete questions[idx][field]; }                                     // เอาออกจากข้อนี้ข้อเดียว (ข้ออื่นยังใช้ต่อ)
+    else if (oldId && examSettings.contexts && examSettings.contexts[oldId]) { examSettings.contexts[oldId].text = text; }  // แก้ชุดที่ใช้ร่วมกัน
+    else { const nid = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); (examSettings.contexts = examSettings.contexts || {})[nid] = { text: text, imgs: [] }; questions[idx][field] = nid; }
+  };
+  setCtxField('secId', document.getElementById('editSec').value.trim());
+  setCtxField('ctxId', document.getElementById('editCtx').value.trim());
   saveToStorage();
   renderQuestionList();
   closeEditModal();
@@ -3309,7 +3399,7 @@ function renderQuestionList() {
     <div class="question-item">
       <button class="q-edit" onclick="openEditModal(${q.id})">✏️</button>
       <button class="q-delete" onclick="deleteQuestion(${q.id})">✕</button>
-      <div class="q-num">ข้อที่ ${i+1}${q.needsAnswer ? '<span class="needs-answer">⚠️ ยังไม่ระบุเฉลย กด ✏️ เพื่อเลือก</span>' : ''}</div>
+      <div class="q-num">ข้อที่ ${i+1}${secChip(q)}${q.needsAnswer ? '<span class="needs-answer">⚠️ ยังไม่ระบุเฉลย กด ✏️ เพื่อเลือก</span>' : ''}</div>
       ${ctxMini(q)}
       <div class="q-text">${renderRich(q.text, q)}</div>
       <div class="q-choices">
@@ -3522,7 +3612,7 @@ function renderQuestion() {
     </button>`;
   }).join('');
 
-  document.getElementById('questionCard').innerHTML = ctxHtml(q) + `
+  document.getElementById('questionCard').innerHTML = secHtml(q) + ctxHtml(q) + `
     <div class="q-header">
       <span class="q-num-badge">ข้อ ${currentQ + 1}</span>
       <div class="q-text-main">${renderRich(q.text, q)}</div>
