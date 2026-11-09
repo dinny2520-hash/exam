@@ -6,6 +6,7 @@
 <title>ระบบสอบออนไลน์</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Kanit:wght@400;500;600;700&display=swap');
@@ -746,6 +747,17 @@
   @media (min-width: 600px) {
     .choice-inputs { grid-template-columns: 1fr 1fr; }
   }
+
+  /* ข้อสอบแบบมีรูป / กรอบ / ตาราง */
+  .q-text-main { min-width: 0; }
+  .q-box { border: 2px solid #1a3a6b; border-radius: 8px; padding: 8px 12px; margin: 8px 0; background: #f7faff; font-weight: 400; }
+  .q-table-wrap { overflow-x: auto; margin: 8px 0; max-width: 100%; }
+  .q-table { border-collapse: collapse; font-size: 0.92em; }
+  .q-table td { border: 1px solid #9fb0d0; padding: 4px 10px; }
+  .q-img { max-width: 100%; height: auto; border-radius: 4px; vertical-align: middle; }
+  .q-img-missing { color: var(--text-muted); font-size: 12px; font-style: italic; }
+  .question-item .q-img { max-width: 170px; max-height: 130px; width: auto !important; }
+  .needs-answer { display: inline-block; margin-left: 8px; padding: 1px 10px; border-radius: 12px; background: #fde; color: #c0392b; font-size: 11px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -867,8 +879,8 @@
       <div class="section-title">นำเข้าข้อสอบจากไฟล์</div>
 
       <div class="alert alert-info">
-        📌 <strong>Excel/CSV:</strong> คอลัมน์ A=คำถาม, B=ก., C=ข., D=ค., E=ง., F=เฉลย (ก/ข/ค/ง)<br>
-        📌 <strong>Word (.docx):</strong> แต่ละข้อขึ้นบรรทัดใหม่ รูปแบบ: <em>คำถาม / ก.ตัวเลือก / ข.ตัวเลือก / ค.ตัวเลือก / ง.ตัวเลือก / เฉลย:ก</em>
+        📌 <strong>Excel/CSV:</strong> คอลัมน์ A=คำถาม, B=ก., C=ข., D=ค., E=ง., F=เฉลย (ก/ข/ค/ง) หรือจะทำ<strong style="color:#c0392b">ตัวหนังสือของตัวเลือกที่ถูกเป็นสีแดง</strong>แทนก็ได้ (ไม่ต้องใส่ F)<br>
+        📌 <strong>Word (.docx):</strong> พิมพ์ข้อสอบตามปกติ (1. คำถาม / ก. ข. ค. ง.) แล้วทำ<strong style="color:#c0392b">ตัวหนังสือของคำตอบที่ถูกเป็นสีแดง</strong> ระบบตั้งเฉลยให้เอง และแนบรูปภาพ กรอบ ตารางในข้อสอบมาด้วย
       </div>
 
       <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
@@ -884,7 +896,7 @@
       </div>
       <!-- Debug viewer -->
       <div id="rawTextViewer" class="hidden" style="margin-top:14px;">
-        <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">ข้อความที่อ่านได้จากไฟล์ (raw):</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">ข้อความที่อ่านได้จากไฟล์ (ส่วนที่ครอบด้วย ⟦ ⟧ คือตัวหนังสือสีแดง):</div>
         <textarea id="rawTextBox" readonly style="font-size:11px;height:180px;background:#f0f4f8;font-family:monospace;color:#333;"></textarea>
         <button class="btn btn-sm btn-outline" style="margin-top:6px;" onclick="document.getElementById('rawTextViewer').classList.add('hidden')">ปิด</button>
       </div>
@@ -1256,6 +1268,7 @@
     <div class="form-group">
       <label>คำถาม</label>
       <textarea id="editQ" style="min-height:80px;"></textarea>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.5;">ข้อความ <code>{{img:0}}</code> = รูปภาพ, <code>[[box]]…[[/box]]</code> = กรอบ — อย่าลบถ้าต้องการให้ยังแสดงอยู่</div>
     </div>
     <div class="choice-inputs">
       <div class="form-group">
@@ -1472,6 +1485,7 @@ async function loadFromGitHub() {
         warnings = parseInt(localStorage.getItem('examWarnings') || '0');
         try { answers = JSON.parse(localStorage.getItem('examAnswers') || '{}'); } catch(e) { answers = {}; }
         try { examSession = JSON.parse(localStorage.getItem('examSession') || '[]'); } catch(e) { examSession = []; }
+        examSession = examSession.map(function (it) { const src = questions.find(function (x) { return x.id === it._originalId; }); return src && src.imgs ? Object.assign({}, it, { imgs: src.imgs }) : it; });
         try { student = JSON.parse(localStorage.getItem('examStudent') || '{}'); } catch(e) { student = {}; }
         showPage('lockedPage');
         return;
@@ -1509,6 +1523,9 @@ function showExamQR() {
 
 function downloadQuestionsJSON() {
   if (questions.length === 0) { alert('กรุณาเพิ่มข้อสอบก่อน'); return; }
+  // เตือนถ้ายังมีข้อที่ไม่ได้ระบุเฉลย (ระบบตั้งเป็น ก. ไว้ชั่วคราว จะตัดคะแนนผิดถ้าส่งให้นักเรียน)
+  const pending = questions.map(function (q, i) { return q.needsAnswer ? i + 1 : 0; }).filter(Boolean);
+  if (pending.length && !confirm('⚠️ ยังมี ' + pending.length + ' ข้อที่ยังไม่ได้ระบุเฉลย (ข้อที่ ' + pending.slice(0, 15).join(', ') + (pending.length > 15 ? ' …' : '') + ')\nระบบตั้งเป็น ก. ไว้ชั่วคราว นักเรียนจะถูกตัดคะแนนตามเฉลย ก.\n\nกด "ยกเลิก" เพื่อกลับไปแก้ก่อน (กด ✏️ ที่ข้อที่มีป้ายเตือน)\nกด "ตกลง" เพื่อดาวน์โหลดต่อ')) return;
   // อ่านค่าจากช่องตั้งค่าล่าสุดก่อนทุกครั้ง (กันลืมกดบันทึกการตั้งค่า)
   syncSettingsFromForm();
   saveToStorage();
@@ -1516,6 +1533,8 @@ function downloadQuestionsJSON() {
   examSettings.examVersion = Date.now().toString();
   const data = { questions, settings: examSettings };
   const json = JSON.stringify(data, null, 2);
+  const sizeMB = json.length / 1048576;
+  if (sizeMB > 20 && !confirm('ไฟล์ข้อสอบมีขนาด ' + sizeMB.toFixed(1) + ' MB (ใหญ่เกิน 20 MB อัปโหลดผ่านหน้าเว็บ GitHub ไม่ได้)\nต้องการดาวน์โหลดต่อหรือไม่?')) return;
   const blob = new Blob([json], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1523,7 +1542,7 @@ function downloadQuestionsJSON() {
   a.click();
   URL.revokeObjectURL(a.href);
   setTimeout(() => {
-    alert('✅ ดาวน์โหลด questions.json แล้ว!\n\nค่าที่ใส่ในไฟล์:\n• ข้อสอบ ' + questions.length + ' ข้อ\n• คะแนนเต็ม ' + examSettings.maxScore + '\n• เวลา ' + (examSettings.timeLimit ? examSettings.timeLimit + ' นาที' : 'ไม่จำกัด') + '\n\nขั้นตอนต่อไป:\n1. ไปที่ GitHub repo\n2. กด Add file → Upload files\n3. อัปโหลด questions.json\n4. กด Commit changes\n\nนักเรียนเปิด https://dinny2520-hash.github.io/exam/ ได้เลย!');
+    alert('✅ ดาวน์โหลด questions.json แล้ว!\n\nค่าที่ใส่ในไฟล์:\n• ข้อสอบ ' + questions.length + ' ข้อ\n• คะแนนเต็ม ' + examSettings.maxScore + '\n• เวลา ' + (examSettings.timeLimit ? examSettings.timeLimit + ' นาที' : 'ไม่จำกัด') + '\n• ขนาดไฟล์ ' + sizeMB.toFixed(1) + ' MB' + (questions.some(function (q) { return q.imgs && q.imgs.length; }) ? ' (มีรูปภาพ)' : '') + '\n\nขั้นตอนต่อไป:\n1. ไปที่ GitHub repo\n2. กด Add file → Upload files\n3. อัปโหลด questions.json\n4. กด Commit changes\n\nนักเรียนเปิด https://dinny2520-hash.github.io/exam/ ได้เลย!');
   }, 500);
 }
 
@@ -1672,9 +1691,17 @@ function copyShortURL() {
 
 function generateQR() {} // kept for compatibility
 
+let _quotaWarned = false;
 function saveToStorage() {
-  localStorage.setItem('exam_questions', JSON.stringify(questions));
-  localStorage.setItem('exam_settings', JSON.stringify(examSettings));
+  try {
+    localStorage.setItem('exam_questions', JSON.stringify(questions));
+    localStorage.setItem('exam_settings', JSON.stringify(examSettings));
+  } catch (e) {
+    if (!_quotaWarned) {
+      _quotaWarned = true;
+      alert('⚠️ พื้นที่เก็บข้อมูลในเครื่องเต็ม (ข้อสอบมีรูปภาพมาก)\nข้อมูลล่าสุดอาจไม่ถูกบันทึกในเครื่อง\nแนะนำให้กด "ดาวน์โหลด questions.json" เก็บไว้ทันที และลดจำนวน/ขนาดรูป');
+    }
+  }
 }
 
 function applySettings() {
@@ -1878,9 +1905,9 @@ async function sendAnswerDetailToSheets(r) {
     const details = r.detail
       .map((d, i) => ({
         no: i + 1,
-        text: d.q.text,
-        selectedText: d.sel ? `${d.sel}. ${d.q.choices[d.selIdx] || ''}` : '',
-        correctText: `${d.q.answer}. ${d.q.choices[choiceLabels.indexOf(d.q.answer)] || ''}`,
+        text: plainText(d.q.text),
+        selectedText: d.sel ? `${d.sel}. ${plainText(d.q.choices[d.selIdx] || '')}` : '',
+        correctText: `${d.q.answer}. ${plainText(d.q.choices[choiceLabels.indexOf(d.q.answer)] || '')}`,
         isCorrect: d.isCorrect
       }))
       .filter(d => !d.isCorrect);
@@ -1986,6 +2013,643 @@ function switchTab(tabId) {
 // ============================================================
 // QUESTIONS MANAGEMENT
 // ============================================================
+// ==== IMPORTER START ====
+// ตัวนำเข้าข้อสอบจาก Word/Excel: อ่านสีตัวอักษรแดงเป็นเฉลย + แนบรูป/กรอบ/ตาราง
+const IMP = (function () {
+  'use strict';
+  const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const LETTERS = ['ก', 'ข', 'ค', 'ง'];
+  const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp', webp: 'image/webp', svg: 'image/svg+xml' };
+
+  /* ---------------- XML helpers ---------------- */
+  function parseXml(str) {
+    const doc = new DOMParser().parseFromString(str, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('อ่านโครงสร้างไฟล์ไม่ได้');
+    return doc;
+  }
+  function kids(el, name) { const r = []; if (!el) return r; for (const c of el.children) if (c.localName === name) r.push(c); return r; }
+  function kid(el, name) { if (!el) return null; for (const c of el.children) if (c.localName === name) return c; return null; }
+  function attr(el, name) { if (!el) return null; for (const a of el.attributes) if (a.localName === name) return a.value; return null; }
+  function descendants(el, name) { return Array.from(el.getElementsByTagNameNS('*', name)); }
+
+  function resolvePath(baseDir, target) {
+    if (!target) return null;
+    if (target.charAt(0) === '/') return target.slice(1);
+    const out = [];
+    for (const p of (baseDir + target).split('/')) {
+      if (p === '..') out.pop(); else if (p !== '.' && p !== '') out.push(p);
+    }
+    return out.join('/');
+  }
+  async function readRels(zip, relsPath) {
+    const map = {};
+    const f = zip.file(relsPath);
+    if (!f) return map;
+    const doc = parseXml(await f.async('string'));
+    for (const r of descendants(doc, 'Relationship')) {
+      if (attr(r, 'TargetMode') === 'External') continue;
+      map[attr(r, 'Id')] = attr(r, 'Target');
+    }
+    return map;
+  }
+
+  /* ---------------- สีแดง ---------------- */
+  function isRedHex(hex) {
+    if (!hex || hex.length < 6) return false;
+    hex = hex.slice(-6);
+    const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
+    return r >= 150 && g <= 100 && b <= 100 && (r - Math.max(g, b)) >= 80;
+  }
+  function loadStyles(doc) {
+    const raw = {};
+    for (const s of descendants(doc, 'style')) {
+      const id = attr(s, 'styleId'); if (!id) continue;
+      const rPr = kid(s, 'rPr'), c = rPr && kid(rPr, 'color'), based = kid(s, 'basedOn');
+      raw[id] = { color: c ? attr(c, 'val') : null, based: based ? attr(based, 'val') : null };
+    }
+    function res(id, d) { if (!id || !raw[id] || d > 6) return null; return raw[id].color || res(raw[id].based, d + 1); }
+    const out = {};
+    for (const id in raw) out[id] = { color: res(id, 0) };
+    return out;
+  }
+  function isRunRed(rPr, styles, pStyle) {
+    let color = null, hl = null;
+    if (rPr) {
+      const c = kid(rPr, 'color'); if (c) color = attr(c, 'val');
+      const h = kid(rPr, 'highlight'); if (h) hl = attr(h, 'val');
+      if (!color) { const rs = kid(rPr, 'rStyle'); if (rs && styles[attr(rs, 'val')]) color = styles[attr(rs, 'val')].color; }
+    }
+    if (!color && pStyle && styles[pStyle]) color = styles[pStyle].color;
+    if (hl === 'red' || hl === 'darkRed') return true;
+    return !!(color && color !== 'auto' && isRedHex(color));
+  }
+
+  /* ---------------- docx -> ข้อความ + mask สีแดง ---------------- */
+  function put(ctx, s, red) {
+    const sk = ctx.sink; sk.text += s;
+    const v = red ? 1 : 0;
+    for (let i = 0; i < s.length; i++) sk.mask.push(v);
+  }
+  function withSink(ctx, fn) {
+    const saved = ctx.sink; ctx.sink = { text: '', mask: [] };
+    fn();
+    const r = ctx.sink; ctx.sink = saved; return r;
+  }
+  function appendSink(ctx, sub) {
+    ctx.sink.text += sub.text;
+    for (let i = 0; i < sub.mask.length; i++) ctx.sink.mask.push(sub.mask[i]);
+  }
+  function trimSink(sk) {
+    let a = 0, b = sk.text.length;
+    while (a < b && /\s/.test(sk.text[a])) a++;
+    while (b > a && /\s/.test(sk.text[b - 1])) b--;
+    return { text: sk.text.slice(a, b), mask: sk.mask.slice(a, b) };
+  }
+  function flattenSink(sk) { return { text: sk.text.replace(/[\n\t]/g, ' '), mask: sk.mask.slice() }; }
+
+  function regImage(ctx, relId, extentEmu) {
+    const target = ctx.rels[relId];
+    if (!target) return -1;
+    const path = resolvePath('word/', target);
+    const w = extentEmu ? Math.round(extentEmu / 9525) : 0;
+    const key = path + '|' + w;
+    if (ctx.imgIndex[key] === undefined) { ctx.imgIndex[key] = ctx.imgs.length; ctx.imgs.push({ path: path, w: w }); }
+    return ctx.imgIndex[key];
+  }
+  function closeBox(ctx, st) { if (st.inBox) { put(ctx, '[[/box]]\n', false); st.inBox = false; } }
+
+  function walkBlocks(parent, ctx, st) {
+    for (const el of parent.children) {
+      const n = el.localName;
+      if (n === 'p') processParagraph(el, ctx, st);
+      else if (n === 'tbl') { closeBox(ctx, st); processTable(el, ctx); }
+      else if (n === 'sdt') { const c = kid(el, 'sdtContent'); if (c) walkBlocks(c, ctx, st); }
+      else if (n === 'customXml' || n === 'ins' || n === 'moveTo') walkBlocks(el, ctx, st);
+    }
+  }
+
+  function hasFourBorders(pPr) {
+    const bd = kid(pPr, 'pBdr');
+    if (!bd) return false;
+    return ['top', 'left', 'bottom', 'right'].every(function (side) {
+      const e = kid(bd, side); const v = e ? attr(e, 'val') : null;
+      return v && v !== 'nil' && v !== 'none';
+    });
+  }
+
+  function processParagraph(p, ctx, st) {
+    const pPr = kid(p, 'pPr');
+    let boxed = false, pStyle = null;
+    if (pPr) {
+      boxed = hasFourBorders(pPr);
+      const ps = kid(pPr, 'pStyle'); if (ps) pStyle = attr(ps, 'val');
+    }
+    if (boxed && !st.inBox) { put(ctx, '[[box]]\n', false); st.inBox = true; }
+    if (!boxed && st.inBox) closeBox(ctx, st);
+    processInline(p, ctx, pStyle);
+    put(ctx, '\n', false);
+  }
+
+  function processInline(el, ctx, pStyle) {
+    for (const c of el.children) {
+      const n = c.localName;
+      if (n === 'r') processRun(c, ctx, pStyle);
+      else if (n === 'hyperlink' || n === 'ins' || n === 'smartTag' || n === 'fldSimple' || n === 'moveTo' || n === 'customXml') processInline(c, ctx, pStyle);
+      else if (n === 'sdt') { const sc = kid(c, 'sdtContent'); if (sc) processInline(sc, ctx, pStyle); }
+      else if (n === 'AlternateContent') { const ch = kid(c, 'Choice'); if (ch) processInline(ch, ctx, pStyle); }
+    }
+  }
+
+  function processRun(r, ctx, pStyle) {
+    const red = isRunRed(kid(r, 'rPr'), ctx.styles, pStyle);
+    for (const c of r.children) {
+      switch (c.localName) {
+        case 't': put(ctx, c.textContent, red); break;
+        case 'tab': case 'ptab': put(ctx, '\t', false); break;
+        case 'br': { const t = attr(c, 'type'); if (t !== 'page' && t !== 'column') put(ctx, '\n', false); break; }
+        case 'cr': put(ctx, '\n', false); break;
+        case 'noBreakHyphen': put(ctx, '-', red); break;
+        case 'drawing': processDrawing(c, ctx); break;
+        case 'pict': processPict(c, ctx); break;
+        case 'AlternateContent': {
+          const ch = kid(c, 'Choice');
+          if (ch) for (const d of ch.children) {
+            if (d.localName === 'drawing') processDrawing(d, ctx); else if (d.localName === 'pict') processPict(d, ctx);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  function processTextBoxes(boxes, ctx) {
+    for (const t of boxes) {
+      put(ctx, '\n[[box]]\n', false);
+      const st2 = { inBox: false };
+      walkBlocks(t, ctx, st2);
+      closeBox(ctx, st2);
+      put(ctx, '[[/box]]\n', false);
+    }
+  }
+  function processDrawing(d, ctx) {
+    const tx = descendants(d, 'txbxContent');
+    if (tx.length) { processTextBoxes(tx, ctx); return; }
+    const ext = descendants(d, 'extent')[0];
+    const cx = ext ? parseInt(attr(ext, 'cx') || '0', 10) : 0;
+    for (const b of descendants(d, 'blip')) {
+      const idx = regImage(ctx, attr(b, 'embed'), cx);
+      if (idx >= 0) put(ctx, '{{img:' + idx + '}}', false);
+    }
+  }
+  function processPict(pict, ctx) {
+    const tx = descendants(pict, 'txbxContent');
+    if (tx.length) { processTextBoxes(tx, ctx); return; }
+    for (const im of descendants(pict, 'imagedata')) {
+      const idx = regImage(ctx, attr(im, 'id'), 0);
+      if (idx >= 0) put(ctx, '{{img:' + idx + '}}', false);
+    }
+  }
+
+  function processTable(tbl, ctx) {
+    const rows = kids(tbl, 'tr').map(function (tr) {
+      return kids(tr, 'tc').map(function (tc) {
+        return trimSink(withSink(ctx, function () {
+          const st = { inBox: false };
+          walkBlocks(tc, ctx, st);
+          closeBox(ctx, st);
+        }));
+      });
+    });
+    // ตารางที่ใช้จัดตัวเลือก ก. ข. ค. ง. -> แตกเป็นบรรทัดปกติ
+    let labelLines = 0;
+    rows.forEach(function (row) { row.forEach(function (cell) { labelLines += (cell.text.match(/(^|\n)[ \t]*[กขคง][ \t]*[.)\-:：]/g) || []).length; }); });
+    if (labelLines >= 2) {
+      rows.forEach(function (row) {
+        row.forEach(function (cell, k) { if (k > 0) put(ctx, '\t', false); appendSink(ctx, cell); });
+        put(ctx, '\n', false);
+      });
+      return;
+    }
+    // ตาราง 1 ช่อง = กรอบสี่เหลี่ยม
+    if (rows.length === 1 && rows[0].length === 1) {
+      put(ctx, '[[box]]\n', false); appendSink(ctx, rows[0][0]); put(ctx, '\n[[/box]]\n', false);
+      return;
+    }
+    // ตารางข้อมูลทั่วไป
+    put(ctx, '[[table]]\n', false);
+    rows.forEach(function (row) {
+      put(ctx, '¦ ', false);
+      row.forEach(function (cell, k) { if (k > 0) put(ctx, ' | ', false); appendSink(ctx, flattenSink(cell)); });
+      put(ctx, '\n', false);
+    });
+    put(ctx, '[[/table]]\n', false);
+  }
+
+  async function docxToText(buf) {
+    const zip = await JSZip.loadAsync(buf);
+    const f = zip.file('word/document.xml');
+    if (!f) throw new Error('ไม่ใช่ไฟล์ .docx');
+    const doc = parseXml(await f.async('string'));
+    const ctx = { sink: { text: '', mask: [] }, imgs: [], imgIndex: {}, rels: await readRels(zip, 'word/_rels/document.xml.rels'), styles: {} };
+    const stF = zip.file('word/styles.xml');
+    if (stF) { try { ctx.styles = loadStyles(parseXml(await stF.async('string'))); } catch (e) { ctx.styles = {}; } }
+    const body = doc.getElementsByTagNameNS(W_NS, 'body')[0];
+    if (!body) throw new Error('ไม่พบเนื้อหาในไฟล์');
+    const st = { inBox: false };
+    walkBlocks(body, ctx, st);
+    closeBox(ctx, st);
+    return { text: ctx.sink.text, mask: ctx.sink.mask, imgs: ctx.imgs, zip: zip };
+  }
+
+  /* ---------------- แยกข้อสอบจากข้อความ ---------------- */
+  const RE_NUM_STRICT = /^[ \t]*(?:ข้อ[ \t]*)?(\d{1,3})[ \t]*[.)](?!\d)[ \t]*(?=\S|\n)/gm;
+  const RE_NUM_LOOSE = /(?:ข้อ[ \t]*)?(\d{1,3})[ \t]*[.)](?!\d)[ \t]*(?=[ก-๙A-Za-z{\[])/g;
+  const RE_STRICT = /([\s\u00a0\]\}]|^)([กขคง])[ \t]*[.)\-:：]/g;
+  const RE_LOOSE = /()([กขคง])[ \t]*[.)\-:：]/g;
+
+  function collectStarts(text, re, checkPrevDigit) {
+    const out = []; re.lastIndex = 0; let m;
+    while ((m = re.exec(text)) !== null) {
+      if (m[0].length === 0) { re.lastIndex++; continue; }
+      if (checkPrevDigit && m.index > 0 && /\d/.test(text[m.index - 1])) continue;
+      let s = m.index, boxOpen = false;
+      const before = text.slice(Math.max(0, s - 12), s);
+      const mb = /\[\[box\]\]\n$/.exec(before);
+      if (mb) { s -= mb[0].length; boxOpen = true; }
+      out.push({ s: s, bodyStart: m.index + m[0].length, no: parseInt(m[1], 10), boxOpen: boxOpen });
+    }
+    return out;
+  }
+  function findLabels(s, re) {
+    const out = []; re.lastIndex = 0; let m;
+    while ((m = re.exec(s)) !== null) {
+      out.push({ letter: m[2], start: m.index + m[1].length, end: m.index + m[0].length });
+    }
+    return out;
+  }
+  function chooseChain(cands) {
+    let best = null;
+    const as = cands.filter(function (c) { return c.letter === 'ก'; });
+    for (let i = as.length - 1; i >= 0; i--) {
+      const chain = [as[i]]; let pos = as[i].start;
+      for (const L of ['ข', 'ค', 'ง']) {
+        const nx = cands.find(function (c) { return c.letter === L && c.start > pos; });
+        if (!nx) break;
+        chain.push(nx); pos = nx.start;
+      }
+      if (chain.length >= 2 && (!best || chain.length > best.length)) best = chain;
+      if (best && best.length === 4) break;
+    }
+    return best;
+  }
+  function balanceBoxes(s) {
+    const re = /\[\[(\/?)box\]\]/g, marks = []; let m;
+    while ((m = re.exec(s)) !== null) marks.push({ i: m.index, len: m[0].length, close: m[1] === '/' });
+    const stack = [], drop = new Set();
+    marks.forEach(function (mk, k) { if (!mk.close) stack.push(k); else if (stack.length) stack.pop(); else drop.add(k); });
+    stack.forEach(function (k) { drop.add(k); });
+    if (!drop.size) return s;
+    let out = '', pos = 0;
+    marks.forEach(function (mk, k) { if (drop.has(k)) { out += s.slice(pos, mk.i); pos = mk.i + mk.len; } });
+    return out + s.slice(pos);
+  }
+  function cleanStem(s) {
+    s = balanceBoxes(s);
+    s = s.replace(/[ \t\u00a0]+/g, ' ');
+    s = s.split('\n').map(function (l) { return l.trim(); }).join('\n');
+    return s.replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '');
+  }
+  function cleanChoice(s) {
+    return s.replace(/\[\[\/?(?:box|table)\]\]/g, '').replace(/¦/g, '').replace(/[ \t\u00a0]+/g, ' ').replace(/\s*\n\s*/g, ' ').trim();
+  }
+
+  function decideAnswer(reds, nChoices, ansLetter) {
+    const idx = []; reds.forEach(function (r, i) { if (r) idx.push(i); });
+    if (idx.length === 1) return { ans: idx[0], how: 'red' };
+    const li = ansLetter ? LETTERS.indexOf(ansLetter) : -1;
+    if (li >= 0) return { ans: li, how: 'line' };
+    if (idx.length > 1 && idx.length < nChoices) return { ans: -1, how: 'ambiguous' };
+    return { ans: -1, how: 'none' };
+  }
+
+  function parseBlock(text, mask, b) {
+    let seg = text.slice(b.bodyStart, b.e);
+    let segMask = mask.slice(b.bodyStart, b.e);
+    let ansLetter = null;
+    const am = /(?:^|\n)[ \t]*(?:เฉลย|คำตอบ|ตอบ|ans(?:wer)?)[ \t]*[:：.\-]?[ \t]*([กขคง])(?![ก-๙])/i.exec(seg);
+    if (am) { ansLetter = am[1]; seg = seg.slice(0, am.index); segMask = segMask.slice(0, am.index); }
+
+    let chain = chooseChain(findLabels(seg, RE_STRICT));
+    if (!chain || chain.length < 4) {
+      const c2 = chooseChain(findLabels(seg, RE_LOOSE));
+      if (c2 && (!chain || c2.length > chain.length)) chain = c2;
+    }
+    if (!chain) return null;
+
+    const n = chain.length, last = chain[n - 1];
+    let segEnd = seg.length;
+    const bl = /\n[ \t]*\n/.exec(seg.slice(last.end));
+    if (bl) segEnd = last.end + bl.index;
+
+    const choices = ['', '', '', ''], reds = [];
+    for (let i = 0; i < n; i++) {
+      const ce = i + 1 < n ? chain[i + 1].start : segEnd;
+      choices[i] = cleanChoice(seg.slice(chain[i].end, ce));
+      let red = false;
+      for (let j = chain[i].start; j < ce; j++) { if (segMask[j] === 1 && !/\s/.test(seg[j])) { red = true; break; } }
+      reds.push(red);
+    }
+    const stem = cleanStem((b.boxOpen ? '[[box]]\n' : '') + seg.slice(0, chain[0].start));
+    if (!stem) return null;
+    const dec = decideAnswer(reds, n, ansLetter);
+    return { no: b.no, text: stem, choices: choices, ansIdx: dec.ans, how: dec.how };
+  }
+
+  function parseQuestions(text, mask) {
+    const warnings = [];
+    let starts = collectStarts(text, RE_NUM_STRICT, false);
+    if (!starts.length) starts = collectStarts(text, RE_NUM_LOOSE, true);
+    if (!starts.length) return { questions: [], warnings: ['ไม่พบเลขข้อ (เช่น 1. 2. 3.) ในไฟล์'] };
+    const questions = [];
+    starts.forEach(function (st, i) {
+      const b = { s: st.s, bodyStart: st.bodyStart, e: i + 1 < starts.length ? starts[i + 1].s : text.length, no: st.no, boxOpen: st.boxOpen };
+      const q = parseBlock(text, mask, b);
+      if (q) questions.push(q); else warnings.push('ข้อ ' + st.no + ': ไม่พบตัวเลือก ก. ข. จึงข้ามไป');
+    });
+    return { questions: questions, warnings: warnings };
+  }
+
+  function remapImages(q, all) {
+    const map = {}, list = [];
+    const fix = function (s) {
+      return s.replace(/\{\{img:(\d+)\}\}/g, function (m, g) {
+        if (!(g in map)) { map[g] = list.length; list.push(Object.assign({}, all[+g])); }
+        return '{{img:' + map[g] + '}}';
+      });
+    };
+    q.text = fix(q.text);
+    q.choices = q.choices.map(fix);
+    return list;
+  }
+
+  /* ---------------- รูปภาพ ---------------- */
+  function bytesToDataURL(bytes, mime) {
+    let bin = ''; const STEP = 0x8000;
+    for (let i = 0; i < bytes.length; i += STEP) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + STEP));
+    return 'data:' + mime + ';base64,' + btoa(bin);
+  }
+  async function toDataImage(bytes, mime, dispW, opts) {
+    const canCanvas = !(opts && opts.noCompress) && typeof document !== 'undefined' && typeof Image !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL;
+    if (!canCanvas || mime === 'image/svg+xml' || mime === 'image/gif') return { s: bytesToDataURL(bytes, mime), w: dispW || 0 };
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    try {
+      const img = await new Promise(function (res, rej) { const im = new Image(); im.onload = function () { res(im); }; im.onerror = function () { rej(new Error('img')); }; im.src = url; });
+      const nw = img.naturalWidth, nh = img.naturalHeight, MAXW = 800;
+      if (bytes.length <= 60 * 1024 && nw <= MAXW) return { s: bytesToDataURL(bytes, mime), w: dispW || nw };
+      const sc = Math.min(1, MAXW / nw);
+      const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(nw * sc)); cv.height = Math.max(1, Math.round(nh * sc));
+      const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+      return { s: cv.toDataURL('image/jpeg', 0.8), w: dispW ? Math.min(dispW, cv.width) : cv.width };
+    } finally { URL.revokeObjectURL(url); }
+  }
+  async function loadImage(zip, it, opts) {
+    try {
+      const f = zip.file(it.path); if (!f) throw new Error('missing');
+      const mime = MIME[it.path.split('.').pop().toLowerCase()]; if (!mime) throw new Error('unsupported');
+      return await toDataImage(await f.async('uint8array'), mime, it.w, opts);
+    } catch (e) { return { s: '', w: 0, failed: true }; }
+  }
+  async function finalizeImages(zip, questions, opts) {
+    const cache = new Map(); let failed = 0, total = 0;
+    for (const q of questions) {
+      if (!q.imgs) continue;
+      for (let k = 0; k < q.imgs.length; k++) {
+        const it = q.imgs[k], key = it.path + '|' + it.w;
+        if (!cache.has(key)) cache.set(key, loadImage(zip, it, opts));
+        q.imgs[k] = await cache.get(key);
+        total++; if (q.imgs[k].failed) failed++;
+      }
+    }
+    return { total: total, failed: failed };
+  }
+
+  function markRed(text, mask) {
+    let out = '', inRed = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i], ws = /\s/.test(c), r = mask[i] === 1;
+      if (!ws) { if (r && !inRed) { out += '⟦'; inRed = true; } else if (!r && inRed) { out += '⟧'; inRed = false; } }
+      else if (c === '\n' && inRed) { out += '⟧'; inRed = false; }
+      out += c;
+    }
+    return out + (inRed ? '⟧' : '');
+  }
+
+  async function importDocx(buf, opts) {
+    const d = await docxToText(buf);
+    const parsed = parseQuestions(d.text, d.mask);
+    const questions = [], meta = [];
+    parsed.questions.forEach(function (p) {
+      const q = { id: Date.now() + Math.random(), text: p.text, choices: p.choices, answer: LETTERS[p.ansIdx >= 0 ? p.ansIdx : 0] };
+      if (p.ansIdx < 0) q.needsAnswer = true;
+      const imgs = remapImages(q, d.imgs);
+      if (imgs.length) q.imgs = imgs;
+      questions.push(q); meta.push({ no: p.no, how: p.how });
+    });
+    const im = await finalizeImages(d.zip, questions, opts);
+    return { questions: questions, meta: meta, warnings: parsed.warnings, rawView: markRed(d.text, d.mask), imgTotal: im.total, imgFailed: im.failed };
+  }
+
+  /* ---------------- Excel ---------------- */
+  async function xlsxExtras(zip) {
+    const red = new Set(), imgs = {};
+    const wbDoc = parseXml(await zip.file('xl/workbook.xml').async('string'));
+    const first = descendants(wbDoc, 'sheet')[0];
+    const wbRels = await readRels(zip, 'xl/_rels/workbook.xml.rels');
+    const sheetPath = resolvePath('xl/', wbRels[attr(first, 'id')]);
+
+    const xfRed = [];
+    const stF = zip.file('xl/styles.xml');
+    if (stF) {
+      const sd = parseXml(await stF.async('string'));
+      const fontsEl = descendants(sd, 'fonts')[0];
+      const fontRed = (fontsEl ? kids(fontsEl, 'font') : []).map(function (f) {
+        const c = kid(f, 'color'); if (!c) return false;
+        const idx = attr(c, 'indexed');
+        return isRedHex(attr(c, 'rgb') || '') || idx === '10' || idx === '2';
+      });
+      const xfs = descendants(sd, 'cellXfs')[0];
+      if (xfs) kids(xfs, 'xf').forEach(function (xf, i) { xfRed[i] = !!fontRed[parseInt(attr(xf, 'fontId') || '0', 10)]; });
+    }
+    function runsRed(parent) {
+      for (const r of kids(parent, 'r')) {
+        const rPr = kid(r, 'rPr'), c = rPr && kid(rPr, 'color');
+        if (c && (isRedHex(attr(c, 'rgb') || '') || attr(c, 'indexed') === '10')) {
+          const t = kid(r, 't'); if (t && t.textContent.trim()) return true;
+        }
+      }
+      return false;
+    }
+    const ssRed = [];
+    const ssF = zip.file('xl/sharedStrings.xml');
+    if (ssF) { const sd = parseXml(await ssF.async('string')); for (const si of descendants(sd, 'si')) ssRed.push(runsRed(si)); }
+
+    const sh = parseXml(await zip.file(sheetPath).async('string'));
+    for (const c of descendants(sh, 'c')) {
+      const addr = attr(c, 'r'), t = attr(c, 't');
+      let isRed = !!xfRed[parseInt(attr(c, 's') || '0', 10)];
+      if (t === 's') { const v = kid(c, 'v'); if (v && ssRed[parseInt(v.textContent, 10)]) isRed = true; }
+      else if (t === 'inlineStr') { const is = kid(c, 'is'); if (is && runsRed(is)) isRed = true; }
+      if (isRed) red.add(addr);
+    }
+
+    // รูปที่วางบนชีต (drawing) -> ผูกกับเซลล์ที่รูปวางอยู่
+    const dr = descendants(sh, 'drawing')[0];
+    if (dr) {
+      const dir = sheetPath.slice(0, sheetPath.lastIndexOf('/') + 1), base = sheetPath.slice(sheetPath.lastIndexOf('/') + 1);
+      const sRels = await readRels(zip, dir + '_rels/' + base + '.rels');
+      const drPath = resolvePath(dir, sRels[attr(dr, 'id')]);
+      if (drPath && zip.file(drPath)) {
+        const drDir = drPath.slice(0, drPath.lastIndexOf('/') + 1), drBase = drPath.slice(drPath.lastIndexOf('/') + 1);
+        const dRels = await readRels(zip, drDir + '_rels/' + drBase + '.rels');
+        const dd = parseXml(await zip.file(drPath).async('string'));
+        for (const an of dd.documentElement.children) {
+          if (['twoCellAnchor', 'oneCellAnchor', 'absoluteAnchor'].indexOf(an.localName) < 0) continue;
+          const from = kid(an, 'from'); if (!from) continue;
+          const col = parseInt((kid(from, 'col') || {}).textContent || '0', 10), row = parseInt((kid(from, 'row') || {}).textContent || '0', 10);
+          const addr = XLSX.utils.encode_cell({ r: row, c: col });
+          for (const b of descendants(an, 'blip')) {
+            const tgt = dRels[attr(b, 'embed')]; if (!tgt) continue;
+            (imgs[addr] = imgs[addr] || []).push({ path: resolvePath(drDir, tgt) });
+          }
+        }
+      }
+    }
+    return { red: red, imgs: imgs, zip: zip };
+  }
+
+  async function importXlsx(buf, opts) {
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const empty = { questions: [], meta: [], warnings: ['ชีตแรกว่างเปล่า'], rawView: '', imgTotal: 0, imgFailed: 0 };
+    if (!ws || !ws['!ref']) return empty;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    let extras = { red: new Set(), imgs: {}, zip: null };
+    try { extras = await xlsxExtras(await JSZip.loadAsync(buf)); } catch (e) { extras = { red: new Set(), imgs: {}, zip: null }; }
+    const allImgs = [], imgIdx = {};
+    function cellInfo(r, ci) {
+      const addr = XLSX.utils.encode_cell({ r: r, c: range.s.c + ci });
+      const cell = ws[addr];
+      let t = '';
+      if (cell) t = (cell.w !== undefined && cell.w !== null) ? String(cell.w) : (cell.v !== undefined && cell.v !== null ? String(cell.v) : '');
+      t = t.replace(/\r/g, '').trim();
+      (extras.imgs[addr] || []).forEach(function (im) {
+        if (imgIdx[im.path] === undefined) { imgIdx[im.path] = allImgs.length; allImgs.push({ path: im.path, w: 0 }); }
+        t += (t ? ' ' : '') + '{{img:' + imgIdx[im.path] + '}}';
+      });
+      return { t: t, red: t.length > 0 && extras.red.has(addr) };
+    }
+    const questions = [], meta = [], warnings = [];
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      const q0 = cellInfo(r, 0);
+      if (r === range.s.r && q0.t.toLowerCase().indexOf('คำถาม') >= 0) continue;
+      if (!q0.t) continue;
+      const cs = [1, 2, 3, 4].map(function (c) { return cellInfo(r, c); });
+      if (!cs[0].t) { warnings.push('แถว ' + (r + 1) + ': ไม่มีตัวเลือก ก. จึงข้ามไป'); continue; }
+      const letter = cellInfo(r, 5).t.charAt(0);
+      const nCh = cs.filter(function (c) { return c.t; }).length;
+      const dec = decideAnswer(cs.map(function (c) { return c.red; }), nCh, LETTERS.indexOf(letter) >= 0 ? letter : null);
+      const q = { id: Date.now() + Math.random(), text: q0.t, choices: cs.map(function (c) { return c.t; }), answer: LETTERS[dec.ans >= 0 ? dec.ans : 0] };
+      if (dec.ans < 0) q.needsAnswer = true;
+      const imgs = remapImages(q, allImgs);
+      if (imgs.length) q.imgs = imgs;
+      questions.push(q); meta.push({ no: r + 1 - range.s.r, how: dec.how });
+    }
+    const im = extras.zip ? await finalizeImages(extras.zip, questions, opts) : { total: 0, failed: 0 };
+    return { questions: questions, meta: meta, warnings: warnings, rawView: '', imgTotal: im.total, imgFailed: im.failed };
+  }
+
+  /* ---------------- แสดงผล ---------------- */
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function renderRich(str, q) {
+    if (str === null || str === undefined) return '';
+    let h = esc(str);
+    h = h.replace(/\[\[table\]\]\n?([\s\S]*?)\[\[\/table\]\]\n?/g, function (m, body) {
+      const rows = body.split('\n').filter(function (l) { return l.trim(); }).map(function (l) {
+        const cells = l.replace(/^\s*¦\s?/, '').split(' | ');
+        return '<tr>' + cells.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+      });
+      return '<div class="q-table-wrap"><table class="q-table">' + rows.join('') + '</table></div>';
+    });
+    h = h.replace(/\[\[box\]\]\n?([\s\S]*?)\[\[\/box\]\]\n?/g, function (m, body) {
+      return '<div class="q-box">' + body.replace(/^\n+|\n+$/g, '').replace(/\n/g, '<br>') + '</div>';
+    });
+    h = h.replace(/\{\{img:(\d+)\}\}/g, function (m, i) {
+      const im = q && q.imgs && q.imgs[+i];
+      if (!im || !im.s) return '<span class="q-img-missing">[รูปภาพ]</span>';
+      return '<img class="q-img" src="' + im.s + '" alt="" style="max-width:100%;height:auto;' + (im.w ? 'width:' + im.w + 'px;' : '') + '">';
+    });
+    return h.replace(/\n/g, '<br>');
+  }
+  function plainText(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/\{\{img:(\d+)\}\}/g, function (m, i) { return '[รูปที่ ' + (+i + 1) + ']'; })
+      .replace(/\[\[\/?(?:box|table)\]\]/g, '').replace(/¦ ?/g, '')
+      .replace(/[ \t]*\n[ \t]*/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  return { importDocx: importDocx, importXlsx: importXlsx, renderRich: renderRich, plainText: plainText, esc: esc, _parseQuestions: parseQuestions, _docxToText: docxToText };
+})();
+// ==== IMPORTER END ====
+
+const renderRich = IMP.renderRich;
+const plainText = IMP.plainText;
+
+// สรุปผลหลังนำเข้า (ใช้ร่วมกันทั้ง Word และ Excel)
+function finishImport(res) {
+  res.questions.forEach(function (q) { questions.push(q); });
+  saveToStorage();
+  renderQuestionList();
+  updateReadyAlert();
+  const n = res.questions.length;
+  const nosOf = function (h) { return res.meta.filter(function (m) { return m.how === h; }).map(function (m) { return m.no; }); };
+  const listNos = function (a) { return 'ข้อ ' + a.slice(0, 25).join(', ') + (a.length > 25 ? ' …' : ''); };
+  const red = nosOf('red'), line = nosOf('line'), none = nosOf('none'), amb = nosOf('ambiguous');
+  let msg = '✅ นำเข้าข้อสอบ ' + n + ' ข้อ\n• ตั้งเฉลยจากตัวหนังสือสีแดง ' + red.length + ' ข้อ';
+  if (line.length) msg += '\n• ตั้งเฉลยจากบรรทัด "เฉลย:" / คอลัมน์ F ' + line.length + ' ข้อ';
+  if (none.length) msg += '\n\n⚠️ ไม่พบเฉลย ' + none.length + ' ข้อ (' + listNos(none) + ')\n   ตั้งเป็น ก. ไว้ก่อน และมีป้ายเตือนในรายการ ให้กด ✏️ เลือกเฉลยที่ถูก';
+  if (amb.length) msg += '\n\n⚠️ พบสีแดงหลายตัวเลือก ' + amb.length + ' ข้อ (' + listNos(amb) + ')\n   ตั้งเป็น ก. ไว้ก่อน ให้กด ✏️ เลือกเฉลยที่ถูก';
+  if (res.imgTotal) msg += '\n\n🖼 แนบรูปภาพ ' + res.imgTotal + ' รูป' + (res.imgFailed ? '\n   แสดงไม่ได้ ' + res.imgFailed + ' รูป (รูปแบบไม่รองรับ เช่น EMF/WMF ให้แทรกเป็น PNG/JPG)' : '');
+  if (res.warnings && res.warnings.length) msg += '\n\nหมายเหตุ:\n' + res.warnings.slice(0, 8).join('\n');
+  if (n > 0 && red.length === 0 && line.length === 0) {
+    msg += '\n\nไม่พบตัวหนังสือสีแดงในไฟล์เลย ตรวจว่าใช้สีแดงจริง (ไม่ใช่สีส้ม/ชมพู) ดูได้ที่ปุ่ม "🔍 ดูข้อความดิบ"';
+    const v = document.getElementById('rawTextViewer'); if (v) v.classList.remove('hidden');
+  }
+  alert(msg);
+}
+
+async function readWord(file) {
+  let res = null;
+  try {
+    res = await IMP.importDocx(await file.arrayBuffer());
+    const box = document.getElementById('rawTextBox');
+    if (box) box.value = (res.rawView || '').slice(0, 8000);
+    if (!res.questions.length) res = null;
+  } catch (e) { console.log('importDocx fallback:', e); res = null; }
+  if (!res) { readWordLegacy(file); return; }
+  finishImport(res);
+}
+
+async function readExcel(file) {
+  let res = null;
+  try {
+    res = await IMP.importXlsx(await file.arrayBuffer());
+    if (!res.questions.length) res = null;
+  } catch (e) { console.log('importXlsx fallback:', e); res = null; }
+  if (!res) { readExcelLegacy(file); return; }
+  finishImport(res);
+}
+
 function handleFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -2000,7 +2664,7 @@ function handleFileUpload(e) {
   e.target.value = '';
 }
 
-function readExcel(file) {
+function readExcelLegacy(file) {
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
@@ -2035,7 +2699,7 @@ function readExcel(file) {
   reader.readAsBinaryString(file);
 }
 
-function readWord(file) {
+function readWordLegacy(file) {
   const reader = new FileReader();
   reader.onload = function(e) {
     const arrayBuffer = e.target.result;
@@ -2266,11 +2930,11 @@ function exportExcel() {
   const header = ['ข้อที่', 'คำถาม', 'ก.', 'ข.', 'ค.', 'ง.', 'เฉลย'];
   const rows = questions.map((q, i) => [
     i + 1,
-    q.text,
-    q.choices[0] || '',
-    q.choices[1] || '',
-    q.choices[2] || '',
-    q.choices[3] || '',
+    plainText(q.text),
+    plainText(q.choices[0] || ''),
+    plainText(q.choices[1] || ''),
+    plainText(q.choices[2] || ''),
+    plainText(q.choices[3] || ''),
     q.answer + '.'
   ]);
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
@@ -2308,11 +2972,11 @@ function exportPrint() {
   const qHtml = questions.map((q, i) => `
     <div class="pq">
       <div class="pq-num">ข้อที่ ${i + 1}.</div>
-      <div class="pq-text">${q.text}</div>
+      <div class="pq-text">${renderRich(q.text, q)}</div>
       <div class="pq-choices">
         ${q.choices.map((c, ci) => `
           <div class="pq-choice ${q.answer === choiceLabelsLocal[ci] ? 'correct' : ''}">
-            <span class="pq-key">${choiceLabelsLocal[ci]}.</span> ${c || '-'}
+            <span class="pq-key">${choiceLabelsLocal[ci]}.</span> ${renderRich(c, q) || '-'}
           </div>
         `).join('')}
       </div>
@@ -2328,6 +2992,10 @@ function exportPrint() {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Sarabun', sans-serif; font-size: 14px; color: #111; padding: 24px 32px; }
     h1 { font-family: 'Kanit', sans-serif; font-size: 20px; text-align: center; margin-bottom: 4px; }
+    .q-box { border: 1.5px solid #000; padding: 6px 10px; margin: 6px 0; }
+    .q-table { border-collapse: collapse; margin: 6px 0; }
+    .q-table td { border: 1px solid #000; padding: 3px 8px; }
+    .q-img { max-width: 100%; height: auto; }
     .meta { text-align: center; font-size: 13px; color: #555; margin-bottom: 24px; }
     .pq { margin-bottom: 20px; page-break-inside: avoid; }
     .pq-num { font-weight: 700; color: #1a3a6b; margin-bottom: 4px; }
@@ -2418,6 +3086,7 @@ function saveEditQuestion() {
   const ans = document.getElementById('editAnswer').value;
   if (!text || !a || !b) { alert('กรุณากรอกคำถามและตัวเลือก ก. ข. อย่างน้อย'); return; }
   questions[idx] = { ...questions[idx], text, choices: [a, b, c, d], answer: ans };
+  delete questions[idx].needsAnswer; // ผู้ดูแลตรวจเฉลยแล้ว
   saveToStorage();
   renderQuestionList();
   closeEditModal();
@@ -2455,15 +3124,15 @@ function renderQuestionList() {
     <div class="question-item">
       <button class="q-edit" onclick="openEditModal(${q.id})">✏️</button>
       <button class="q-delete" onclick="deleteQuestion(${q.id})">✕</button>
-      <div class="q-num">ข้อที่ ${i+1}</div>
-      <div class="q-text">${q.text}</div>
+      <div class="q-num">ข้อที่ ${i+1}${q.needsAnswer ? '<span class="needs-answer">⚠️ ยังไม่ระบุเฉลย กด ✏️ เพื่อเลือก</span>' : ''}</div>
+      <div class="q-text">${renderRich(q.text, q)}</div>
       <div class="q-choices">
-        <span>ก. ${q.choices[0]||'-'}</span>
-        <span>ข. ${q.choices[1]||'-'}</span>
-        <span>ค. ${q.choices[2]||'-'}</span>
-        <span>ง. ${q.choices[3]||'-'}</span>
+        <span>ก. ${renderRich(q.choices[0], q)||'-'}</span>
+        <span>ข. ${renderRich(q.choices[1], q)||'-'}</span>
+        <span>ค. ${renderRich(q.choices[2], q)||'-'}</span>
+        <span>ง. ${renderRich(q.choices[3], q)||'-'}</span>
       </div>
-      <div class="q-answer">✓ เฉลย: ${q.answer}. ${q.choices[choiceLabels.indexOf(q.answer)]||''}</div>
+      <div class="q-answer">✓ เฉลย: ${q.answer}. ${renderRich(q.choices[choiceLabels.indexOf(q.answer)], q)||''}</div>
     </div>
   `).join('');
 }
@@ -2663,14 +3332,14 @@ function renderQuestion() {
       onclick="selectAnswer(${i})"
       style="pointer-events:auto;">
       <span class="choice-key">${choiceLabels[i]}</span>
-      <span style="flex:1;word-break:break-word;">${c || '-'}</span>
+      <span style="flex:1;min-width:0;word-break:break-word;">${renderRich(c, q) || '-'}</span>
     </button>`;
   }).join('');
 
   document.getElementById('questionCard').innerHTML = `
     <div class="q-header">
       <span class="q-num-badge">ข้อ ${currentQ + 1}</span>
-      <div class="q-text-main">${q.text}</div>
+      <div class="q-text-main">${renderRich(q.text, q)}</div>
     </div>
     <div class="choices">${choicesHTML}</div>
   `;
@@ -2937,7 +3606,7 @@ function lockExam() {
     localStorage.setItem('examTimeLeft', examTimeLeft);
     localStorage.setItem('examCurrentQ', currentQ);
     localStorage.setItem('examAnswers', JSON.stringify(answers));
-    localStorage.setItem('examSession', JSON.stringify(examSession));
+    localStorage.setItem('examSession', JSON.stringify(examSession.map(function (it) { const c = Object.assign({}, it); delete c.imgs; return c; })));
     localStorage.setItem('examStudent', JSON.stringify(student));
     localStorage.setItem('examWarnings', warnings);
   } catch(e) {}
